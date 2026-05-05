@@ -1,0 +1,15 @@
+name = "cloudnav"
+compatibility_date = "2024-01-01"
+pages_build_output_dir = "./dist"
+
+# Cloudflare Pages 自动从 functions/ 目录部署 Serverless Functions
+# KV 绑定需要在 Cloudflare Dashboard 中配置
+
+# 如果使用 Cloudflare Workers (非 Pages)，取消注释以下配置：
+# [vars]
+# PASSWORD = ""
+# ALLOWED_ORIGIN = "https://your-domain.com"
+
+# [[kv_namespaces]]
+# binding = "CLOUDNAV_KV"
+# id = "your-kv-namespace-id"

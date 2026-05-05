@@ -1,1144 +1,558 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Bot, Key, Globe, Sparkles, PauseCircle, Wrench, Box, Copy, Check, Settings, Clock, Lock, LayoutGrid, MessageCircle, Cloud, BookOpen, Upload, CloudCog, LogOut, Download } from 'lucide-react';
-import { AIConfig, LinkItem, PasswordExpiryConfig, MastodonConfig, WeatherConfig } from '../types';
-import { generateLinkDescription } from '../services/geminiService';
+import React, { useState, useEffect } from 'react';
+import { X, Save, Settings, Clock, LayoutGrid, MessageCircle, Cloud, BookOpen, Upload, CloudCog, LogOut, Loader2, Plus, Trash2, Search } from 'lucide-react';
+import { AIConfig, PasswordExpiryConfig, TickerConfig, WeatherConfig, WeatherProvider, TickerSource, SearchConfig } from '../types';
 import { toast } from './Toast';
+import { SEARCH_ENGINES } from '../src/constants';
+
+interface SettingsData {
+  ai: AIConfig;
+  passwordExpiry: PasswordExpiryConfig;
+  ticker: TickerConfig;
+  weather: WeatherConfig;
+  showPinnedWebsites: boolean;
+  defaultViewMode: 'compact' | 'detailed';
+  search: SearchConfig;
+}
+
+const DEFAULT_SETTINGS: SettingsData = {
+  ai: { provider: 'google', apiKey: '', baseUrl: '', model: 'gemini-2.5-flash', websiteTitle: '', navigationName: '', faviconUrl: '' },
+  passwordExpiry: { value: 1, unit: 'week' },
+  ticker: { enabled: false, source: 'mastodon', customItems: [] },
+  weather: { enabled: false, provider: 'jinrishici', unit: 'celsius' },
+  showPinnedWebsites: true,
+  defaultViewMode: 'detailed',
+  search: { mode: 'internal', externalSources: [], selectedSource: null, defaultEngine: 'google' },
+};
+
+const AI_MODELS: Record<string, { label: string; defaultModel: string; defaultBaseUrl: string }> = {
+  google: { label: 'Google Gemini', defaultModel: 'gemini-2.5-flash', defaultBaseUrl: 'https://generativelanguage.googleapis.com' },
+  openai: { label: 'OpenAI 兼容', defaultModel: 'gpt-4o', defaultBaseUrl: 'https://api.openai.com/v1' },
+  claude: { label: 'Claude', defaultModel: 'claude-sonnet-4-20250514', defaultBaseUrl: 'https://api.anthropic.com' },
+};
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  config: AIConfig;
-  onSave: (config: AIConfig) => void;
-  links: LinkItem[];
-  onUpdateLinks: (links: LinkItem[]) => void;
-  passwordExpiryConfig: PasswordExpiryConfig;
-  onSavePasswordExpiry: (config: PasswordExpiryConfig) => void;
   authToken: string | null;
-  showPinnedWebsites: boolean;
-  onShowPinnedWebsitesChange: (show: boolean) => void;
-  mastodonConfig: MastodonConfig;
-  onMastodonConfigChange: (config: Partial<MastodonConfig>) => void;
-  weatherConfig: WeatherConfig;
-  onWeatherConfigChange: (config: Partial<WeatherConfig>) => void;
+  onSettingsLoaded: (settings: SettingsData) => void;
   onImportClick: () => void;
   onBackupClick: () => void;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
-    isOpen, onClose, config, onSave, links, onUpdateLinks, passwordExpiryConfig, onSavePasswordExpiry, authToken, showPinnedWebsites, onShowPinnedWebsitesChange, mastodonConfig, onMastodonConfigChange, weatherConfig, onWeatherConfigChange, onImportClick, onBackupClick
+  isOpen, onClose, authToken, onSettingsLoaded, onImportClick, onBackupClick
 }) => {
-  console.log('SettingsModal rendering. isOpen:', isOpen, 'authToken:', authToken, 'config:', config);
-  const [activeTab, setActiveTab] = useState<'tools' | 'website'>('website');
-  const [localConfig, setLocalConfig] = useState<AIConfig>(config || {});
-  const [localPasswordExpiryConfig, setLocalPasswordExpiryConfig] = useState<PasswordExpiryConfig>(passwordExpiryConfig || { value: 1, unit: 'week' });
-  const [defaultViewMode, setDefaultViewMode] = useState<'compact' | 'detailed'>('compact');
-  const [localMastodonConfig, setLocalMastodonConfig] = useState<MastodonConfig>(mastodonConfig || { enabled: false });
-  const [mastodonInputValue, setMastodonInputValue] = useState<string>(
-    (mastodonConfig && mastodonConfig.username && mastodonConfig.instance) ?
-    `@${mastodonConfig.username}@${mastodonConfig.instance}` : ''
-  );
-  const [localWeatherConfig, setLocalWeatherConfig] = useState<WeatherConfig>(weatherConfig || { enabled: false });
-
-  // Bulk Generation State
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState({ current: 0, total: 0 });
-  const shouldStopRef = useRef(false);
-
-  // Tools State
-  const [password, setPassword] = useState('');
-  const [domain, setDomain] = useState('');
-  const [showExtCode, setShowExtCode] = useState(true);
-
-  // Copy feedback states
-  const [copiedStates, setCopiedStates] = useState<{[key: string]: boolean}>({});
-
-  // Auth State (Moved to top to fix Rules of Hooks)
-  const [authPassword, setAuthPassword] = useState('');
-  const [authError, setAuthError] = useState('');
-  const [authLoading, setAuthLoading] = useState(false);
+  const [settings, setSettings] = useState<SettingsData>(DEFAULT_SETTINGS);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [mastodonInput, setMastodonInput] = useState('');
 
   useEffect(() => {
-    if (isOpen) {
-      if (config) {
-        setLocalConfig(config);
-        // 从 AI 配置中读取默认视图模式设置
-        if (config.defaultViewMode === 'detailed' || config.defaultViewMode === 'compact') {
-          setDefaultViewMode(config.defaultViewMode);
-        } else {
-          setDefaultViewMode('compact'); // 默认值
-        }
-      }
-      if (passwordExpiryConfig) setLocalPasswordExpiryConfig(passwordExpiryConfig);
-      if (mastodonConfig) {
-        setLocalMastodonConfig(mastodonConfig);
-        setMastodonInputValue(
-          mastodonConfig.username && mastodonConfig.instance ?
-          `@${mastodonConfig.username}@${mastodonConfig.instance}` : ''
-        );
-      }
-      if (weatherConfig) setLocalWeatherConfig(weatherConfig);
-      
-      setIsProcessing(false);
-      setProgress({ current: 0, total: 0 });
-      shouldStopRef.current = false;
-      setDomain(window.location.origin);
-      const storedToken = localStorage.getItem('cloudnav_auth_token');
-      if (storedToken) setPassword(storedToken);
-    }
-  }, [isOpen, config, passwordExpiryConfig, mastodonConfig, weatherConfig, authToken]);
+    if (!isOpen) return;
+    const fetchSettings = async () => {
+      setLoading(true);
+      try {
+        // 1. Try to fetch new config key
+        let res = await fetch('/api/storage?key=config');
+        let data = res.ok ? await res.json() : null;
 
-  const handleChange = (key: keyof AIConfig, value: string) => {
-    setLocalConfig(prev => ({ ...prev, [key]: value }));
-  };
-
-  const handlePasswordExpiryChange = (key: keyof PasswordExpiryConfig, value: string | number) => {
-    setLocalPasswordExpiryConfig(prev => ({ ...prev, [key]: value }));
-  };
-
-  const handleMastodonConfigChange = (key: keyof MastodonConfig, value: boolean | string | number) => {
-    setLocalMastodonConfig(prev => ({ ...prev, [key]: value }));
-  };
-
-  const handleWeatherConfigChange = (key: keyof WeatherConfig, value: boolean | string) => {
-    setLocalWeatherConfig(prev => ({ ...prev, [key]: value }));
-  };
-
-  const handleSave = () => {
-    // 将默认视图模式包含在 AI 配置中一起保存
-    const configWithViewMode = {
-      ...localConfig,
-      defaultViewMode: defaultViewMode
-    };
-    onSave(configWithViewMode);
-    onSavePasswordExpiry(localPasswordExpiryConfig);
-    onMastodonConfigChange(localMastodonConfig);
-    onWeatherConfigChange(localWeatherConfig);
-    onClose();
-  };
-
-  // 处理退出登录
-  const handleLogout = () => {
-    // 清除本地存储的认证信息
-    localStorage.removeItem('cloudnav_auth_token');
-    localStorage.removeItem('lastLoginTime');
-
-    // 触发页面刷新或状态更新
-    window.dispatchEvent(new CustomEvent('authStateChanged', { detail: { isAuthenticated: false } }));
-
-    // 关闭设置模态框
-    onClose();
-
-    // 显示退出成功提示
-    toast.success('已成功退出登录');
-  };
-
-  const handleBulkGenerate = async () => {
-    if (!localConfig.apiKey) {
-        toast.warning("请先配置并保存 API Key");
-        return;
-    }
-
-    const missingLinks = links.filter(l => !l.description);
-    if (missingLinks.length === 0) {
-        toast.info("所有链接都已有描述！");
-        return;
-    }
-
-    if (!confirm(`发现 ${missingLinks.length} 个链接缺少描述，确定要使用 AI 自动生成吗？这可能需要一些时间。`)) return;
-
-    setIsProcessing(true);
-    shouldStopRef.current = false;
-    setProgress({ current: 0, total: missingLinks.length });
-
-    let currentLinks = [...links];
-
-    for (let i = 0; i < missingLinks.length; i++) {
-        if (shouldStopRef.current) break;
-
-        const link = missingLinks[i];
-        try {
-            const desc = await generateLinkDescription(link.title, link.url, localConfig);
-            currentLinks = currentLinks.map(l => l.id === link.id ? { ...l, description: desc } : l);
-            onUpdateLinks(currentLinks);
-            setProgress({ current: i + 1, total: missingLinks.length });
-        } catch (e) {
-            console.error(`Failed to generate for ${link.title}`, e);
-        }
-    }
-
-    setIsProcessing(false);
-  };
-
-  const handleStop = () => {
-      shouldStopRef.current = true;
-      setIsProcessing(false);
-  };
-
-  const handleCopy = (text: string, key: string) => {
-      navigator.clipboard.writeText(text);
-      setCopiedStates(prev => ({ ...prev, [key]: true }));
-      setTimeout(() => {
-          setCopiedStates(prev => ({ ...prev, [key]: false }));
-      }, 2000);
-  };
-
-  const handleDownload = (content: string, filename: string) => {
-      const blob = new Blob([content], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-  };
-
-  const handleTestAI = async () => {
-    if (!localConfig.apiKey) {
-        toast.warning("请先输入 API Key");
-        return;
-    }
-
-    try {
-        // 导入 generateLinkDescription 来测试连接
-        const { generateLinkDescription } = await import('../services/geminiService');
-        const testTitle = "测试链接";
-        const testUrl = "https://example.com";
-
-        toast.info("正在测试 AI 连接...");
-        const description = await generateLinkDescription(testTitle, testUrl, localConfig);
-
-        if (description) {
-            toast.success("AI 服务连接成功！");
-        } else {
-            toast.error("AI 服务返回空结果，请检查配置");
-        }
-    } catch (error: any) {
-        console.error("AI 测试失败：", error);
-        toast.error(`AI 服务测试失败：${error.message || "未知错误"}`);
-    }
-  };
-
-  // --- Chrome Extension Code Generators ---
-
-  // 根据当前域名和密码生成插件代码
-  const getCurrentDomain = () => {
-    // 尝试获取当前域名
-    if (typeof window !== 'undefined') {
-      return window.location.origin;
-    }
-    // 回退到预设值
-    return 'https://s.eallion.com'; // 替换为您的实际域名
-  };
-
-  const currentDomain = domain || getCurrentDomain();
-  const currentPassword = password || '请输入密码';
-
-  const extManifest = `{
-  "manifest_version": 3,
-  "name": "CloudNav Assistant",
-  "version": "3.0",
-  "permissions": ["activeTab"],
-  "host_permissions": ["${currentDomain}/*"],
-  "action": {
-    "default_popup": "popup.html",
-    "default_title": "保存到 CloudNav"
-  }
-}`;
-
-  const extPopupHtml = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body { width: 320px; padding: 16px; font-family: -apple-system, sans-serif; background: #f8fafc; }
-    h3 { margin: 0 0 16px 0; font-size: 16px; color: #0f172a; }
-    label { display: block; font-size: 12px; color: #64748b; margin-bottom: 4px; }
-    input, select { width: 100%; margin-bottom: 12px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
-    button { width: 100%; background: #3b82f6; color: white; border: none; padding: 10px; border-radius: 6px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
-    button:hover { background: #2563eb; }
-    button:disabled { background: #94a3b8; cursor: not-allowed; }
-    #status { margin-top: 12px; text-align: center; font-size: 12px; min-height: 18px; }
-    .error { color: #ef4444; }
-    .success { color: #22c55e; }
-  </style>
-</head>
-<body>
-  <h3>保存到 CloudNav</h3>
-
-  <label>标题</label>
-  <input type="text" id="title" placeholder="网站标题">
-
-  <label>分类</label>
-  <select id="category">
-    <option value="" disabled selected>加载分类中...</option>
-  </select>
-
-  <button id="saveBtn">保存书签</button>
-  <div id="status"></div>
-
-  <script src="popup.js"></script>
-</body>
-</html>`;
-
-  const extPopupJs = `const CONFIG = {
-  apiBase: "${currentDomain}",
-  password: "${currentPassword}"
-};
-
-document.addEventListener('DOMContentLoaded', async () => {
-  const titleInput = document.getElementById('title');
-  const catSelect = document.getElementById('category');
-  const saveBtn = document.getElementById('saveBtn');
-  const statusDiv = document.getElementById('status');
-
-  let currentTabUrl = '';
-
-  // 1. Get Current Tab Info
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tab) {
-    titleInput.value = tab.title || '';
-    currentTabUrl = tab.url || '';
-  }
-
-  // 2. Fetch Categories from CloudNav
-  try {
-    const res = await fetch(\`\${CONFIG.apiBase}/api/storage?checkAuth=true\`, {
-      method: 'GET'
-    });
-
-    const authData = await res.json();
-
-    // Try with password
-    const dataRes = await fetch(\`\${CONFIG.apiBase}/api/storage?getConfig=true&readOnly=true\`, {
-      method: 'GET'
-    });
-
-    if (!dataRes.ok) throw new Error('Failed to fetch categories.');
-
-    const data = await dataRes.json();
-
-    catSelect.innerHTML = '';
-    // Sort categories: Common first, then others
-    const sorted = data.categories.sort((a,b) => {
-        if(a.id === 'common') return -1;
-        if(b.id === 'common') return 1;
-        return 0;
-    });
-
-    sorted.forEach(c => {
-      const opt = document.createElement('option');
-      opt.value = c.id;
-      opt.textContent = c.name;
-      catSelect.appendChild(opt);
-    });
-
-    // Select 'common' by default if exists
-    catSelect.value = 'common';
-
-  } catch (e) {
-    statusDiv.textContent = 'Error: ' + e.message;
-    statusDiv.className = 'error';
-    catSelect.innerHTML = '<option>Load failed</option>';
-    saveBtn.disabled = true;
-  }
-
-  // 3. Save Handler
-  saveBtn.addEventListener('click', async () => {
-    const catId = catSelect.value;
-    const title = titleInput.value;
-
-    if (!currentTabUrl) return;
-
-    saveBtn.disabled = true;
-    saveBtn.textContent = '保存中...';
-    statusDiv.textContent = '';
-
-    try {
-      const res = await fetch(\`\${CONFIG.apiBase}/api/storage\`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-auth-password': CONFIG.password
-        },
-        body: JSON.stringify({
-          action: 'addLink',
-          link: {
-            title: title,
-            url: currentTabUrl,
-            categoryId: catId
+        if (data?.value) {
+          // Mapping AppConfig to SettingsData structure
+          const appConfig = JSON.parse(data.value);
+          setSettings(prev => ({
+            ...prev,
+            ai: appConfig.ai || prev.ai,
+            passwordExpiry: appConfig.website?.passwordExpiry || prev.passwordExpiry,
+            ticker: appConfig.ticker || appConfig.mastodon || prev.ticker,
+            weather: appConfig.weather || prev.weather,
+            showPinnedWebsites: appConfig.ui?.showPinnedWebsites ?? prev.showPinnedWebsites,
+            defaultViewMode: appConfig.view?.defaultMode || appConfig.view?.mode || prev.defaultViewMode,
+            search: appConfig.search || prev.search,
+          }));
+          
+          const ticker = appConfig.ticker || appConfig.mastodon;
+          if (ticker?.mastodonUsername && ticker?.mastodonInstance) {
+            setMastodonInput(`@${ticker.mastodonUsername}@${ticker.mastodonInstance}`);
           }
-        })
+        }
+      } catch (e) {
+        console.error('Failed to load settings:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSettings();
+  }, [isOpen]);
+
+  const handleSave = async () => {
+    if (!authToken) { toast.error('请先登录'); return; }
+    setSaving(true);
+    try {
+      const tickerConfig = { ...settings.ticker };
+      if (tickerConfig.source === 'mastodon' && mastodonInput) {
+        const match = mastodonInput.match(/^@?([^@]+)@(.+)$/);
+        if (match) { tickerConfig.mastodonUsername = match[1]; tickerConfig.mastodonInstance = match[2]; }
+      }
+
+      const finalSettings = { ...settings, ticker: tickerConfig };
+      
+      // Fetch existing config to avoid overwriting other sections like search, webdav, etc.
+      const currentConfigRes = await fetch('/api/storage?key=config');
+      let currentConfig: any = {};
+      if (currentConfigRes.ok) {
+        const data = await currentConfigRes.json();
+        if (data.value) currentConfig = JSON.parse(data.value);
+      }
+      
+      const newConfig = {
+        ...currentConfig,
+        ai: finalSettings.ai,
+        website: { ...(currentConfig.website || {}), passwordExpiry: finalSettings.passwordExpiry },
+        ticker: finalSettings.ticker,
+        mastodon: finalSettings.ticker,
+        weather: finalSettings.weather,
+        ui: { ...(currentConfig.ui || {}), showPinnedWebsites: finalSettings.showPinnedWebsites },
+        view: { ...(currentConfig.view || {}), defaultMode: finalSettings.defaultViewMode, mode: currentConfig.view?.mode || finalSettings.defaultViewMode },
+        search: finalSettings.search,
+      };
+
+      const res = await fetch('/api/storage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-auth-password': authToken },
+        body: JSON.stringify({ key: 'config', value: JSON.stringify(newConfig) }),
       });
 
       if (res.ok) {
-        statusDiv.textContent = '保存成功！';
-        statusDiv.className = 'success';
-        setTimeout(() => window.close(), 1200);
-      } else {
-        throw new Error(res.statusText);
-      }
-    } catch (e) {
-      statusDiv.textContent = '保存失败：' + e.message;
-      statusDiv.className = 'error';
-      saveBtn.disabled = false;
-      saveBtn.textContent = '保存书签';
-    }
-  });
-});`;
+        setSettings(finalSettings);
+        onSettingsLoaded(finalSettings);
+        toast.success('设置已保存');
+        onClose();
+      } else { toast.error('保存失败'); }
+    } catch (e) { toast.error('保存失败'); } finally { setSaving(false); }
+  };
+
+  const update = <K extends keyof SettingsData>(key: K, value: SettingsData[K]) => {
+    setSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  const updateAI = (key: keyof AIConfig, value: string) => {
+    setSettings(prev => ({ ...prev, ai: { ...prev.ai, [key]: value } }));
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('cloudnav_auth_token');
+    localStorage.removeItem('lastLoginTime');
+    window.dispatchEvent(new CustomEvent('authStateChanged', { detail: { isAuthenticated: false } }));
+    onClose();
+    toast.success('已成功退出登录');
+  };
 
   if (!isOpen) return null;
 
-  // 未登录用户必须先输入密码
-  const needsAuth = !authToken;
-
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthLoading(true);
-    setAuthError('');
-
-    try {
-      const response = await fetch('/api/auth', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ password: authPassword }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.token) {
-          // 触发父组件的认证成功回调
-          window.dispatchEvent(new CustomEvent('authSuccess', { detail: { token: data.token } }));
-          // 登录成功后不关闭模态框，而是留在设置页面
-          // onClose();
-        }
-      } else {
-        setAuthError('密码错误');
-      }
-    } catch (err) {
-      setAuthError('认证失败');
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  // 如果没有认证令牌，显示密码输入框
-  if (needsAuth) {
-    return (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-200 dark:border-slate-700">
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-6">
-            管理员登录
-          </h2>
-          <form onSubmit={handleAuth} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                管理员密码
-              </label>
-              <input
-                type="password"
-                value={authPassword}
-                onChange={(e) => setAuthPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="请输入管理员密码"
-                required
-              />
-            </div>
-            {authError && (
-              <p className="text-sm text-red-600 dark:text-red-400">{authError}</p>
-            )}
-            <div className="flex gap-3">
-              <button
-                type="submit"
-                disabled={authLoading}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {authLoading ? '登录中...' : '登录'}
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-              >
-                取消
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  // 已登录用户显示完整的设置面板
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 dark:border-slate-700 flex flex-col max-h-[90vh]">
-
+        {/* Header */}
         <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            设置面板
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <Settings size={20} /> 设置面板
           </h2>
-          <div className="flex gap-4">
-              <button
-                onClick={() => setActiveTab('website')}
-                className={`text-sm font-semibold flex items-center gap-2 pb-1 transition-colors ${activeTab === 'website' ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500' : 'text-slate-500 dark:text-slate-400'}`}
-              >
-                <Settings size={18} /> 网站设置
-              </button>
-              <button
-                onClick={() => setActiveTab('tools')}
-                className={`text-sm font-semibold flex items-center gap-2 pb-1 transition-colors ${activeTab === 'tools' ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500' : 'text-slate-500 dark:text-slate-400'}`}
-              >
-                <Wrench size={18} /> 扩展工具
-              </button>
-            </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-full transition-colors group"
-              title="退出登录"
-              aria-label="退出登录"
-            >
-              <LogOut className="w-5 h-5 text-slate-400 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors" />
+            <button onClick={handleLogout} className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-full transition-colors group" title="退出登录">
+              <LogOut className="w-5 h-5 text-slate-400 group-hover:text-red-600 transition-colors" />
             </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
-              title="关闭设置"
-              aria-label="关闭设置"
-            >
+            <button onClick={onClose} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors">
               <X className="w-5 h-5 dark:text-slate-400" />
             </button>
           </div>
         </div>
 
+        {/* Content */}
         <div className="p-6 space-y-6 overflow-y-auto min-h-[300px]">
-
-            {activeTab === 'tools' && (
-                authToken ? (
-                  <div className="space-y-6">
-                    <div className="space-y-3">
-                        <label className="block text-xs font-medium text-slate-500 mb-1">
-                            第一步：配置生成参数
-                        </label>
-                        <div className="space-y-3">
-                            <div>
-                                <label className="block text-xs font-medium text-slate-500 mb-1">
-                                    访问密码 (用于生成代码)
-                                </label>
-                                <input
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none font-mono tracking-widest"
-                                    placeholder="部署时设置的 PASSWORD"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-slate-500 mb-1">
-                                    网站域名 (可选)
-                                </label>
-                                <input
-                                    type="text"
-                                    value={domain}
-                                    onChange={(e) => setDomain(e.target.value)}
-                                    className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none font-mono"
-                                    placeholder={currentDomain || 'https://s.eallion.com'}
-                                />
-                                <p className="text-[10px] text-slate-400 mt-1">
-                                    留空将使用当前域名：{currentDomain}
-                                </p>
-                            </div>
-                        </div>
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="animate-spin w-8 h-8 text-blue-500" />
+              <span className="ml-3 text-slate-500">加载设置中...</span>
+            </div>
+          ) : (
+            <>
+              {/* 浏览器标签标题 */}
+              <section>
+                <h4 className="font-bold dark:text-white mb-3 text-sm flex items-center gap-2">
+                  <Settings size={16} /> 浏览器标签标题设置
+                </h4>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">网站标题</label>
+                    <input type="text" value={settings.ai.websiteTitle || ''} onChange={(e) => updateAI('websiteTitle', e.target.value)} placeholder="蜗牛个人导航" className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">网页导航名称</label>
+                      <input type="text" value={settings.ai.navigationName || ''} onChange={(e) => updateAI('navigationName', e.target.value)} placeholder="蜗牛导航" className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
                     </div>
-
-                    <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
-                        <h4 className="font-bold dark:text-white mb-2 text-sm flex items-center gap-2">
-                            <Box size={16} /> Chrome 扩展 (弹窗选择版)
-                        </h4>
-                        <p className="text-xs text-slate-500 mb-4">
-                            在本地创建一个文件夹，创建以下 3 个文件，然后使用"加载已解压的扩展程序"安装。
-                            <br/>此扩展允许您点击图标后<strong>手动选择分类</strong>保存。
-                        </p>
-
-                        <div className="space-y-4 animate-in fade-in zoom-in duration-300">
-                            {/* File 1: Manifest */}
-                            <div>
-                                <div className="flex justify-between items-center mb-1">
-                                    <span className="text-xs font-mono font-bold text-slate-500">1. manifest.json</span>
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            onClick={() => handleCopy(extManifest, 'manifest')}
-                                            className="text-[10px] flex items-center gap-1 px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 hover:bg-blue-100 text-slate-600 dark:text-slate-300"
-                                        >
-                                            {copiedStates['manifest'] ? <Check size={12}/> : <Copy size={12}/>} 复制
-                                        </button>
-                                        <button
-                                            onClick={() => handleDownload(extManifest, 'manifest.json')}
-                                            className="text-[10px] flex items-center gap-1 px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 hover:bg-green-100 text-slate-600 dark:text-slate-300"
-                                            title="下载文件"
-                                        >
-                                            <Download size={12}/> 下载
-                                        </button>
-                                    </div>
-                                </div>
-                                <pre className="bg-slate-100 dark:bg-slate-900 p-3 rounded text-[10px] font-mono text-slate-600 dark:text-slate-300 overflow-x-auto border border-slate-200 dark:border-slate-700">
-                                    {extManifest}
-                                </pre>
-                            </div>
-
-                            {/* File 2: Popup HTML */}
-                            <div>
-                                <div className="flex justify-between items-center mb-1">
-                                    <span className="text-xs font-mono font-bold text-slate-500">2. popup.html</span>
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            onClick={() => handleCopy(extPopupHtml, 'popuphtml')}
-                                            className="text-[10px] flex items-center gap-1 px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 hover:bg-blue-100 text-slate-600 dark:text-slate-300"
-                                        >
-                                            {copiedStates['popuphtml'] ? <Check size={12}/> : <Copy size={12}/>} 复制
-                                        </button>
-                                        <button
-                                            onClick={() => handleDownload(extPopupHtml, 'popup.html')}
-                                            className="text-[10px] flex items-center gap-1 px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 hover:bg-green-100 text-slate-600 dark:text-slate-300"
-                                            title="下载文件"
-                                        >
-                                            <Download size={12}/> 下载
-                                        </button>
-                                    </div>
-                                </div>
-                                <pre className="bg-slate-100 dark:bg-slate-900 p-3 rounded text-[10px] font-mono text-slate-600 dark:text-slate-300 overflow-x-auto border border-slate-200 dark:border-slate-700">
-                                    {extPopupHtml}
-                                </pre>
-                            </div>
-
-                            {/* File 3: Popup JS */}
-                            <div>
-                                <div className="flex justify-between items-center mb-1">
-                                    <span className="text-xs font-mono font-bold text-slate-500">3. popup.js</span>
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            onClick={() => handleCopy(extPopupJs, 'popupjs')}
-                                            className="text-[10px] flex items-center gap-1 px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 hover:bg-blue-100 text-slate-600 dark:text-slate-300"
-                                        >
-                                            {copiedStates['popupjs'] ? <Check size={12}/> : <Copy size={12}/>} 复制
-                                        </button>
-                                        <button
-                                            onClick={() => handleDownload(extPopupJs, 'popup.js')}
-                                            className="text-[10px] flex items-center gap-1 px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 hover:bg-green-100 text-slate-600 dark:text-slate-300"
-                                            title="下载文件"
-                                        >
-                                            <Download size={12}/> 下载
-                                        </button>
-                                    </div>
-                                </div>
-                                <pre className="bg-slate-100 dark:bg-slate-900 p-3 rounded text-[10px] font-mono text-slate-600 dark:text-slate-300 overflow-x-auto border border-slate-200 dark:border-slate-700">
-                                    {extPopupJs}
-                                </pre>
-                            </div>
-                        </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">侧边栏网页导航名称</label>
+                      <input type="text" value={settings.ai.sidebarNavigationName || ''} onChange={(e) => updateAI('sidebarNavigationName', e.target.value)} placeholder="留空则默认与网页导航名称相同" className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
                     </div>
                   </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <div className="w-16 h-16 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center mb-4">
-                        <Wrench size={24} className="text-slate-400 dark:text-slate-500" />
-                    </div>
-                    <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">需要登录访问</h3>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">扩展工具需要管理员权限</p>
-                    <button
-                        onClick={handleLoginPrompt}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">网站图标 URL</label>
+                    <input type="text" value={settings.ai.faviconUrl || ''} onChange={(e) => updateAI('faviconUrl', e.target.value)} placeholder="/favicon.ico" className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                  </div>
+                </div>
+              </section>
+
+              {/* 密码过期 */}
+              <section className="pt-6 border-t border-slate-200 dark:border-slate-700">
+                <h4 className="font-bold dark:text-white mb-3 text-sm flex items-center gap-2">
+                  <Clock size={16} /> 密码过期时间
+                </h4>
+                <div className="flex gap-3">
+                  <input type="number" value={settings.passwordExpiry.value} onChange={(e) => update('passwordExpiry', { ...settings.passwordExpiry, value: parseInt(e.target.value) || 1 })} min={1} className="w-24 h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                  <select value={settings.passwordExpiry.unit} onChange={(e) => update('passwordExpiry', { ...settings.passwordExpiry, unit: e.target.value as any })} className="flex-1 h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                    <option value="day">天</option>
+                    <option value="week">周</option>
+                    <option value="month">月</option>
+                    <option value="year">年</option>
+                  </select>
+                </div>
+              </section>
+
+              {/* 搜索设置 */}
+              <section className="pt-6 border-t border-slate-200 dark:border-slate-700">
+                <h4 className="font-bold dark:text-white mb-3 text-sm flex items-center gap-2">
+                  <Search size={16} /> 搜索设置
+                </h4>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">默认搜索引擎</label>
+                    <select 
+                      value={settings.search.defaultEngine || 'google'} 
+                      onChange={(e) => update('search', { ...settings.search, defaultEngine: e.target.value })} 
+                      className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
                     >
-                        立即登录
+                      {SEARCH_ENGINES.map(engine => (
+                        <option key={engine.id} value={engine.id}>{engine.name}</option>
+                      ))}
+                      <option value="custom">自定义</option>
+                    </select>
+                    <p className="text-[10px] text-slate-400 mt-1">未勾选“站内搜索”时使用的外部搜索引擎。</p>
+                  </div>
+                  {settings.search.defaultEngine === 'custom' && (
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">自定义搜索 URL</label>
+                      <input 
+                        type="text" 
+                        value={settings.search.customEngineUrl || ''} 
+                        onChange={(e) => update('search', { ...settings.search, customEngineUrl: e.target.value })} 
+                        placeholder="https://example.com/search?q=" 
+                        className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" 
+                      />
+                      <p className="text-[10px] text-slate-400 mt-1">请输入搜索 URL，关键词将拼接在末尾。</p>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* 默认视图模式 */}
+              <section className="pt-6 border-t border-slate-200 dark:border-slate-700">
+                <h4 className="font-bold dark:text-white mb-3 text-sm flex items-center gap-2">
+                  <LayoutGrid size={16} /> 默认视图模式
+                </h4>
+                <div className="flex gap-3">
+                  <button onClick={() => update('defaultViewMode', 'compact')} className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${settings.defaultViewMode === 'compact' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-2 border-blue-500' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-2 border-transparent'}`}>简约</button>
+                  <button onClick={() => update('defaultViewMode', 'detailed')} className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${settings.defaultViewMode === 'detailed' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-2 border-blue-500' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-2 border-transparent'}`}>详细</button>
+                </div>
+              </section>
+
+              {/* 置顶网站 */}
+              <section className="pt-6 border-t border-slate-200 dark:border-slate-700">
+                <h4 className="font-bold dark:text-white mb-3 text-sm flex items-center gap-2">
+                  <LayoutGrid size={16} /> 置顶网站
+                </h4>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={settings.showPinnedWebsites} onChange={(e) => update('showPinnedWebsites', e.target.checked)} className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                  <span className="text-sm text-slate-700 dark:text-slate-300">显示置顶网站区域</span>
+                </label>
+              </section>
+
+              {/* 滚动 Ticker */}
+              <section className="pt-6 border-t border-slate-200 dark:border-slate-700">
+                <h4 className="font-bold dark:text-white mb-3 text-sm flex items-center gap-2">
+                  <MessageCircle size={16} /> 滚动 Ticker
+                </h4>
+                <div className="space-y-4">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={settings.ticker.enabled} onChange={(e) => update('ticker', { ...settings.ticker, enabled: e.target.checked })} className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                    <span className="text-sm text-slate-700 dark:text-slate-300">启用滚动 Ticker</span>
+                  </label>
+                  {settings.ticker.enabled && (
+                    <div className="space-y-4 pl-8">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">数据来源</label>
+                        <select value={settings.ticker.source} onChange={(e) => update('ticker', { ...settings.ticker, source: e.target.value as TickerSource })} className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                          <option value="mastodon">Mastodon</option>
+                          <option value="memos">Memos</option>
+                          <option value="custom">自定义</option>
+                        </select>
+                      </div>
+
+                      {/* Mastodon 配置 */}
+                      {settings.ticker.source === 'mastodon' && (
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1">用户地址</label>
+                            <input type="text" value={mastodonInput} onChange={(e) => setMastodonInput(e.target.value)} placeholder="@username@instance.com" className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1">显示条数</label>
+                            <input type="number" value={settings.ticker.mastodonLimit || 10} onChange={(e) => update('ticker', { ...settings.ticker, mastodonLimit: parseInt(e.target.value) || 10 })} min={1} max={40} className="w-24 h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={settings.ticker.mastodonExcludeReplies !== false} onChange={(e) => update('ticker', { ...settings.ticker, mastodonExcludeReplies: e.target.checked })} className="w-4 h-4 rounded border-slate-300 text-blue-600" />
+                              <span className="text-xs text-slate-600 dark:text-slate-400">排除回复</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={settings.ticker.mastodonExcludeReblogs !== false} onChange={(e) => update('ticker', { ...settings.ticker, mastodonExcludeReblogs: e.target.checked })} className="w-4 h-4 rounded border-slate-300 text-blue-600" />
+                              <span className="text-xs text-slate-600 dark:text-slate-400">排除转嘟</span>
+                            </label>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Memos 配置 */}
+                      {settings.ticker.source === 'memos' && (
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1">Memos 地址</label>
+                            <input type="text" value={settings.ticker.memosHost || ''} onChange={(e) => update('ticker', { ...settings.ticker, memosHost: e.target.value })} placeholder="https://memos.example.com" className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1">API Token</label>
+                            <input type="password" value={settings.ticker.memosToken || ''} onChange={(e) => update('ticker', { ...settings.ticker, memosToken: e.target.value })} className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1">用户名</label>
+                            <input type="text" value={settings.ticker.memosCreator || ''} onChange={(e) => update('ticker', { ...settings.ticker, memosCreator: e.target.value })} placeholder="john" className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                            <p className="text-[10px] text-slate-400 mt-1">只填用户名，如 john，系统自动拼接为 users/john</p>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1">可见性</label>
+                            <select value={settings.ticker.memosVisibility || 'PUBLIC'} onChange={(e) => update('ticker', { ...settings.ticker, memosVisibility: e.target.value as 'PUBLIC' | 'PROTECTED' | 'PRIVATE' })} className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                              <option value="PUBLIC">公开 (PUBLIC)</option>
+                              <option value="PROTECTED">受保护 (PROTECTED)</option>
+                              <option value="PRIVATE">私有 (PRIVATE)</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1">显示条数</label>
+                            <input type="number" value={settings.ticker.memosLimit || 10} onChange={(e) => update('ticker', { ...settings.ticker, memosLimit: parseInt(e.target.value) || 10 })} min={1} className="w-24 h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 自定义配置 */}
+                      {settings.ticker.source === 'custom' && (
+                        <div className="space-y-2">
+                          <label className="block text-xs font-medium text-slate-500 mb-1">自定义内容</label>
+                          {(settings.ticker.customItems || []).map((item, index) => (
+                            <div key={index} className="flex gap-2">
+                              <input type="text" value={item} onChange={(e) => {
+                                const newItems = [...(settings.ticker.customItems || [])];
+                                newItems[index] = e.target.value;
+                                update('ticker', { ...settings.ticker, customItems: newItems });
+                              }} className="flex-1 p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
+                              <button onClick={() => {
+                                const newItems = (settings.ticker.customItems || []).filter((_, i) => i !== index);
+                                update('ticker', { ...settings.ticker, customItems: newItems });
+                              }} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"><Trash2 size={14} /></button>
+                            </div>
+                          ))}
+                          <button onClick={() => update('ticker', { ...settings.ticker, customItems: [...(settings.ticker.customItems || []), ''] })} className="flex items-center gap-1 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors">
+                            <Plus size={14} /> 添加项目
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* 天气设置 */}
+              <section className="pt-6 border-t border-slate-200 dark:border-slate-700">
+                <h4 className="font-bold dark:text-white mb-3 text-sm flex items-center gap-2">
+                  <Cloud size={16} /> 天气设置
+                </h4>
+                <div className="space-y-4">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={settings.weather.enabled} onChange={(e) => update('weather', { ...settings.weather, enabled: e.target.checked })} className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                    <span className="text-sm text-slate-700 dark:text-slate-300">启用天气显示</span>
+                  </label>
+                  {settings.weather.enabled && (
+                    <div className="space-y-4 pl-8">
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-medium text-slate-500">天气 API</label>
+                          {settings.weather.provider === 'qweather' && <a href="https://dev.qweather.com/docs/api/" target="_blank" rel="noreferrer" className="text-[10px] text-blue-500 hover:underline">和风天气 API 文档</a>}
+                          {settings.weather.provider === 'openweather' && <a href="https://openweathermap.org/api" target="_blank" rel="noreferrer" className="text-[10px] text-blue-500 hover:underline">OpenWeather API</a>}
+                          {settings.weather.provider === 'visualcrossing' && <a href="https://www.visualcrossing.com/weather-api" target="_blank" rel="noreferrer" className="text-[10px] text-blue-500 hover:underline">Visual Crossing API</a>}
+                          {settings.weather.provider === 'accuweather' && <a href="https://developer.accuweather.com/apis" target="_blank" rel="noreferrer" className="text-[10px] text-blue-500 hover:underline">AccuWeather API</a>}
+                        </div>
+                        <select value={settings.weather.provider} onChange={(e) => update('weather', { ...settings.weather, provider: e.target.value as WeatherProvider })} className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                          <option value="jinrishici">今日诗词（默认，免费）</option>
+                          <option value="qweather">和风天气 QWeather</option>
+                          <option value="openweather">OpenWeather</option>
+                          <option value="visualcrossing">Visual Crossing</option>
+                          <option value="accuweather">AccuWeather</option>
+                        </select>
+                      </div>
+
+                      {settings.weather.provider === 'jinrishici' && (
+                        <p className="text-xs text-slate-400">使用今日诗词 API，无需配置，勾选即启用。</p>
+                      )}
+
+                      {settings.weather.provider === 'qweather' && (
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1">API Host</label>
+                            <input type="text" value={settings.weather.qweatherHost || ''} onChange={(e) => update('weather', { ...settings.weather, qweatherHost: e.target.value })} placeholder="xxxx.re.qweatherapi.com" className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                            <p className="text-[10px] text-slate-400 mt-1">和风天气 API Host，格式如 xxxx.re.qweatherapi.com</p>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1">API Key</label>
+                            <input type="password" value={settings.weather.qweatherApiKey || ''} onChange={(e) => update('weather', { ...settings.weather, qweatherApiKey: e.target.value })} className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1">位置 ID</label>
+                            <input type="text" value={settings.weather.qweatherLocation || ''} onChange={(e) => update('weather', { ...settings.weather, qweatherLocation: e.target.value })} placeholder="101010100" className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                          </div>
+                        </div>
+                      )}
+
+                      {settings.weather.provider === 'openweather' && (
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1">API Key</label>
+                            <input type="password" value={settings.weather.openweatherApiKey || ''} onChange={(e) => update('weather', { ...settings.weather, openweatherApiKey: e.target.value })} className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1">城市名</label>
+                            <input type="text" value={settings.weather.openweatherCity || ''} onChange={(e) => update('weather', { ...settings.weather, openweatherCity: e.target.value })} placeholder="Beijing" className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                          </div>
+                        </div>
+                      )}
+
+                      {settings.weather.provider === 'visualcrossing' && (
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1">API Key</label>
+                            <input type="password" value={settings.weather.visualcrossingApiKey || ''} onChange={(e) => update('weather', { ...settings.weather, visualcrossingApiKey: e.target.value })} className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1">位置</label>
+                            <input type="text" value={settings.weather.visualcrossingLocation || ''} onChange={(e) => update('weather', { ...settings.weather, visualcrossingLocation: e.target.value })} placeholder="Beijing,China" className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                          </div>
+                        </div>
+                      )}
+
+                      {settings.weather.provider === 'accuweather' && (
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1">API Key</label>
+                            <input type="password" value={settings.weather.accuweatherApiKey || ''} onChange={(e) => update('weather', { ...settings.weather, accuweatherApiKey: e.target.value })} className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1">Location Key</label>
+                            <input type="text" value={settings.weather.accuweatherLocationKey || ''} onChange={(e) => update('weather', { ...settings.weather, accuweatherLocationKey: e.target.value })} className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                          </div>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">温度单位</label>
+                        <select value={settings.weather.unit || 'celsius'} onChange={(e) => update('weather', { ...settings.weather, unit: e.target.value as 'celsius' | 'fahrenheit' })} className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                          <option value="celsius">摄氏度 (°C)</option>
+                          <option value="fahrenheit">华氏度 (°F)</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* AI 配置 */}
+              <section className="pt-6 border-t border-slate-200 dark:border-slate-700">
+                <h4 className="font-bold dark:text-white mb-3 text-sm flex items-center gap-2">
+                  <BookOpen size={16} /> AI 配置
+                </h4>
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-medium text-slate-500">AI 提供商</label>
+                      {settings.ai.provider === 'google' && <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-[10px] text-blue-500 hover:underline">Google Gemini API</a>}
+                      {settings.ai.provider === 'openai' && <a href="https://platform.openai.com/docs/api-reference" target="_blank" rel="noreferrer" className="text-[10px] text-blue-500 hover:underline">OpenAI API</a>}
+                      {settings.ai.provider === 'claude' && <a href="https://docs.anthropic.com/en/api/getting-started" target="_blank" rel="noreferrer" className="text-[10px] text-blue-500 hover:underline">Claude API</a>}
+                    </div>
+                    <select value={settings.ai.provider} onChange={(e) => {
+                      const provider = e.target.value as keyof typeof AI_MODELS;
+                      const defaults = AI_MODELS[provider];
+                      updateAI('provider', provider);
+                      if (defaults) {
+                        updateAI('model', defaults.defaultModel);
+                        updateAI('baseUrl', defaults.defaultBaseUrl);
+                      }
+                    }} className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                      {Object.entries(AI_MODELS).map(([key, val]) => (
+                        <option key={key} value={key}>{val.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">API Key</label>
+                    <input type="password" value={settings.ai.apiKey || ''} onChange={(e) => updateAI('apiKey', e.target.value)} className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Base URL</label>
+                    <input type="text" value={settings.ai.baseUrl || ''} onChange={(e) => updateAI('baseUrl', e.target.value)} placeholder={AI_MODELS[settings.ai.provider]?.defaultBaseUrl || ''} className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">模型</label>
+                    <input type="text" value={settings.ai.model || ''} onChange={(e) => updateAI('model', e.target.value)} placeholder={AI_MODELS[settings.ai.provider]?.defaultModel || ''} className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                  </div>
+                </div>
+              </section>
+
+              {/* 网站内容管理 */}
+              {authToken && (
+                <section className="pt-6 border-t border-slate-200 dark:border-slate-700">
+                  <h4 className="font-bold dark:text-white mb-3 text-sm flex items-center gap-2">
+                    <CloudCog size={16} /> 网站内容管理
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button onClick={onImportClick} className="flex flex-col items-center justify-center gap-2 p-3 text-sm text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 rounded-lg border border-slate-200 dark:border-slate-600 transition-all">
+                      <Upload size={18} /><span>导入书签</span>
+                    </button>
+                    <button onClick={onBackupClick} className="flex flex-col items-center justify-center gap-2 p-3 text-sm text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 rounded-lg border border-slate-200 dark:border-slate-600 transition-all">
+                      <CloudCog size={18} /><span>备份恢复</span>
                     </button>
                   </div>
-                )
-            )}
-
-            {activeTab === 'website' && (
-                <div className="space-y-6">
-
-                    <div>
-                        <h4 className="font-bold dark:text-white mb-3 text-sm flex items-center gap-2">
-                            <Settings size={16} /> 浏览器标签标题设置
-                        </h4>
-                        <p className="text-xs text-slate-500 mb-4">
-                            配置浏览器标签页显示的网站标题，让您的书签管理器更具个性化。
-                        </p>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-medium text-slate-500 mb-1">
-                                    网站标题
-                                </label>
-                                <input
-                                    type="text"
-                                    value={localConfig?.websiteTitle || ''}
-                                    onChange={(e) => handleChange('websiteTitle', e.target.value)}
-                                    placeholder="CloudNav - 我的导航"
-                                    className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                                />
-                                <p className="text-[10px] text-slate-400 mt-1">
-                                    显示在浏览器标签页上的标题
-                                </p>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-slate-500 mb-1">
-                                    网页导航名称
-                                </label>
-                                <input
-                                    type="text"
-                                    value={localConfig?.navigationName || ''}
-                                    onChange={(e) => handleChange('navigationName', e.target.value)}
-                                    placeholder="CloudNav"
-                                    className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                                />
-                                <p className="text-[10px] text-slate-400 mt-1">
-                                    显示在网页左上角的导航名称
-                                </p>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-slate-500 mb-1">
-                                    网站图标 (Favicon URL)
-                                </label>
-                                <input
-                                    type="text"
-                                    value={localConfig?.faviconUrl || ''}
-                                    onChange={(e) => handleChange('faviconUrl', e.target.value)}
-                                    placeholder="/favicon.ico"
-                                    className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                                />
-                                <p className="text-[10px] text-slate-400 mt-1">
-                                    网站图标的 URL 地址
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
-                        <h4 className="font-bold dark:text-white mb-3 text-sm flex items-center gap-2">
-                            <Clock size={16} /> 密码过期时间设置
-                        </h4>
-                        <p className="text-xs text-slate-500 mb-4">
-                            配置访问密码的过期时间，提高安全性。设置为"永久"则密码不会过期。
-                        </p>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-medium text-slate-500 mb-1">
-                                    过期时间数值
-                                </label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    value={localPasswordExpiryConfig?.value}
-                                    onChange={(e) => handlePasswordExpiryChange('value', parseInt(e.target.value) || 1)}
-                                    className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                                />
-                                <p className="text-[10px] text-slate-400 mt-1">
-                                    密码过期的具体数值
-                                </p>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-slate-500 mb-1">
-                                    过期时间单位
-                                </label>
-                                <select
-                                    value={localPasswordExpiryConfig?.unit}
-                                    onChange={(e) => handlePasswordExpiryChange('unit', e.target.value)}
-                                    className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                                >
-                                    <option value="day">天</option>
-                                    <option value="week">周</option>
-                                    <option value="month">月</option>
-                                    <option value="year">年</option>
-                                    <option value="permanent">永久</option>
-                                </select>
-                                <p className="text-[10px] text-slate-400 mt-1">
-                                    选择密码过期的时间单位
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <h4 className="font-bold dark:text-white mb-3 text-sm flex items-center gap-2">
-                            <LayoutGrid size={16} /> 置顶网站设置
-                        </h4>
-                        <p className="text-xs text-slate-500 mb-4">
-                            配置置顶网站的显示或隐藏状态。
-                        </p>
-                        <div className="space-y-4">
-                            <button
-                                onClick={() => onShowPinnedWebsitesChange(!showPinnedWebsites)}
-                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium ${
-                                    showPinnedWebsites
-                                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                                        : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
-                                }`}
-                            >
-                                <div className="p-1">
-                                    <LayoutGrid size={18} />
-                                </div>
-                                <span>{showPinnedWebsites ? '隐藏置顶网站' : '显示置顶网站'}</span>
-                            </button>
-                            <p className="text-xs text-slate-500 mt-2">
-                                {showPinnedWebsites ? '置顶的网站将在页面顶部显示' : '置顶的网站将被隐藏，但仍可通过分类访问'}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
-                        <h4 className="font-bold dark:text-white mb-3 text-sm flex items-center gap-2">
-                            <MessageCircle size={16} /> Mastodon Ticker 设置
-                        </h4>
-                        <p className="text-xs text-slate-500 mb-4">
-                            配置右上角滚动显示的 Mastodon 动态，让访客看到您最新的分享内容。
-                        </p>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="flex items-center gap-3 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={localMastodonConfig?.enabled}
-                                        onChange={(e) => handleMastodonConfigChange('enabled', e.target.checked)}
-                                        className="w-4 h-4 text-blue-600 bg-slate-100 border-slate-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-slate-800 focus:ring-2 dark:bg-slate-700 dark:border-slate-600"
-                                    />
-                                    <span className="text-sm font-medium dark:text-slate-300">启用 Mastodon Ticker</span>
-                                </label>
-                                <p className="text-xs text-slate-500 mt-1 ml-7">
-                                    是否在页面右上角显示滚动的 Mastodon 动态
-                                </p>
-                            </div>
-
-                            {localMastodonConfig?.enabled && (
-                                <>
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-500 mb-1">
-                                            Mastodon 实例和用户名
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={mastodonInputValue}
-                                            onChange={(e) => {
-                                                const value = e.target.value;
-                                                setMastodonInputValue(value);
-
-                                                if (value === '') {
-                                                    // 允许清空输入
-                                                    handleMastodonConfigChange('username', '');
-                                                    handleMastodonConfigChange('instance', '');
-                                                } else {
-                                                    const match = value.match(/^@?(.+?)@(.+)$/);
-                                                    if (match) {
-                                                        handleMastodonConfigChange('username', match[1]);
-                                                        handleMastodonConfigChange('instance', match[2]);
-                                                    }
-                                                }
-                                            }}
-                                            placeholder="例如：@username@mastodon.social"
-                                            className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                                        />
-                                        <p className="text-[10px] text-slate-400 mt-1">
-                                            格式：@用户名@实例域名，如 @eallion@e5n.cc
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-500 mb-1">
-                                            显示条数
-                                        </label>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            max="20"
-                                            value={localMastodonConfig?.limit}
-                                            onChange={(e) => handleMastodonConfigChange('limit', parseInt(e.target.value) || 5)}
-                                            className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                                        />
-                                        <p className="text-[10px] text-slate-400 mt-1">
-                                            获取并显示的动态条数（1-40）
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-500 mb-3">
-                                            内容过滤
-                                        </label>
-                                        <div className="space-y-2">
-                                            <label className="flex items-center gap-3 cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={!localMastodonConfig?.exclude_replies}
-                                                    onChange={(e) => handleMastodonConfigChange('exclude_replies', !e.target.checked)}
-                                                    className="w-4 h-4 text-blue-600 bg-slate-100 border-slate-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-slate-800 focus:ring-2 dark:bg-slate-700 dark:border-slate-600"
-                                                />
-                                                <span className="text-sm dark:text-slate-300">包含回复</span>
-                                            </label>
-                                            <label className="flex items-center gap-3 cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={!localMastodonConfig?.exclude_reblogs}
-                                                    onChange={(e) => handleMastodonConfigChange('exclude_reblogs', !e.target.checked)}
-                                                    className="w-4 h-4 text-blue-600 bg-slate-100 border-slate-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-slate-800 focus:ring-2 dark:bg-slate-700 dark:border-slate-600"
-                                                />
-                                                <span className="text-sm dark:text-slate-300">包含转嘟</span>
-                                            </label>
-                                            <label className="flex items-center gap-3 cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={localMastodonConfig?.pinned}
-                                                    onChange={(e) => handleMastodonConfigChange('pinned', e.target.checked)}
-                                                    className="w-4 h-4 text-blue-600 bg-slate-100 border-slate-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-slate-800 focus:ring-2 dark:bg-slate-700 dark:border-slate-600"
-                                                />
-                                                <span className="text-sm dark:text-slate-300">包含置顶动态</span>
-                                            </label>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
-                        <h4 className="font-bold dark:text-white mb-3 text-sm flex items-center gap-2">
-                            <Cloud size={16} /> 天气设置
-                        </h4>
-                        <p className="text-xs text-slate-500 mb-4">
-                            配置右上角显示的天气信息，使用今日诗词 API 获取实时天气数据，包含温度、湿度、空气质量等信息。
-                        </p>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="flex items-center gap-3 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={localWeatherConfig?.enabled}
-                                        onChange={(e) => handleWeatherConfigChange('enabled', e.target.checked)}
-                                        className="w-4 h-4 text-blue-600 bg-slate-100 border-slate-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-slate-800 focus:ring-2 dark:bg-slate-700 dark:border-slate-600"
-                                    />
-                                    <span className="text-sm font-medium dark:text-slate-300">启用天气显示</span>
-                                </label>
-                                <p className="text-xs text-slate-500 mt-1 ml-7">
-                                    是否在页面右上角显示天气信息
-                                </p>
-                            </div>
-
-                            {localWeatherConfig?.enabled && (
-                                <>
-                                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-                                        <div className="flex items-start gap-3">
-                                            <Cloud className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                                            <div>
-                                                <h5 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">今日诗词天气 API</h5>
-                                                <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
-                                                    免费开源的天气 API，提供实时天气数据，包含温度、湿度、天气状况、空气质量等信息。
-                                                </p>
-                                                <div className="flex items-center gap-2">
-                                                    <a
-                                                        href="https://www.jinrishici.com"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
-                                                    >
-                                                        <Globe size={12} />
-                                                        官方网站
-                                                    </a>
-                                                    <span className="text-xs text-blue-500 dark:text-blue-500">•</span>
-                                                    <a
-                                                        href="https://www.jinrishici.com/doc"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
-                                                    >
-                                                        <Cloud size={12} />
-                                                        API 文档
-                                                    </a>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-xs font-medium text-slate-500 mb-1">
-                                                API 端点
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value="https://v2.jinrishici.com/info"
-                                                readOnly
-                                                className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-400 outline-none transition-all text-sm"
-                                            />
-                                            <p className="text-[10px] text-slate-400 mt-1">
-                                                固定端点，获取天气数据和相关诗词信息
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-slate-500 mb-1">
-                                                更新频率
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value="每10分钟"
-                                                readOnly
-                                                className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-400 outline-none transition-all text-sm"
-                                            />
-                                            <p className="text-[10px] text-slate-400 mt-1">
-                                                自动刷新天气数据
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-500 mb-3">
-                                            显示特性
-                                        </label>
-                                        <div className="grid grid-cols-1 gap-2">
-                                            <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-                                                <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
-                                                实时显示当前温度和天气状况
-                                            </div>
-                                            <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-                                                <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
-                                                包含湿度和空气质量数据
-                                            </div>
-                                            <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-                                                <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
-                                                根据天气状况显示相应图标
-                                            </div>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    </div>
-
-                    <div>
-                        <h4 className="font-bold dark:text-white mb-3 text-sm flex items-center gap-2">
-                            <Globe size={16} /> 默认视图模式
-                        </h4>
-                        <p className="text-xs text-slate-500 mb-4">
-                            设置用户访问网站时的默认视图模式。用户仍可以在页面上手动切换视图。
-                        </p>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-medium text-slate-500 mb-3">
-                                    选择默认视图模式
-                                </label>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <button
-                                        onClick={() => setDefaultViewMode('compact')}
-                                        className={`p-4 rounded-lg border-2 transition-all ${
-                                            defaultViewMode === 'compact'
-                                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
-                                            : 'border-slate-200 dark:border-slate-600 dark:bg-slate-700 hover:border-slate-300 dark:hover:border-slate-500'
-                                        }`}
-                                        title="选择简约模式"
-                                    >
-                                        <div className="text-center">
-                                            <div className="w-12 h-12 mx-auto mb-2 bg-slate-200 dark:bg-slate-600 rounded-md flex items-center justify-center">
-                                                <div className="grid grid-cols-2 gap-1">
-                                                    <div className="w-2 h-2 bg-slate-400 rounded-sm"></div>
-                                                    <div className="w-2 h-2 bg-slate-400 rounded-sm"></div>
-                                                    <div className="w-2 h-2 bg-slate-400 rounded-sm"></div>
-                                                    <div className="w-2 h-2 bg-slate-400 rounded-sm"></div>
-                                                </div>
-                                            </div>
-                                            <div className="text-sm font-medium dark:text-white">简约模式</div>
-                                            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">紧凑布局，显示较少信息</div>
-                                        </div>
-                                    </button>
-                                    <button
-                                        onClick={() => setDefaultViewMode('detailed')}
-                                        className={`p-4 rounded-lg border-2 transition-all ${
-                                            defaultViewMode === 'detailed'
-                                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
-                                            : 'border-slate-200 dark:border-slate-600 dark:bg-slate-700 hover:border-slate-300 dark:hover:border-slate-500'
-                                        }`}
-                                        title="选择详情模式"
-                                    >
-                                        <div className="text-center">
-                                            <div className="w-12 h-12 mx-auto mb-2 bg-slate-200 dark:bg-slate-600 rounded-md flex items-center justify-center">
-                                                <div className="space-y-1">
-                                                    <div className="w-8 h-1 bg-slate-400 rounded"></div>
-                                                    <div className="w-6 h-1 bg-slate-400 rounded ml-1"></div>
-                                                    <div className="w-7 h-1 bg-slate-400 rounded ml-0.5"></div>
-                                                </div>
-                                            </div>
-                                            <div className="text-sm font-medium dark:text-white">详情模式</div>
-                                            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">完整布局，显示更多信息</div>
-                                        </div>
-                                    </button>
-                                </div>
-                                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                                    <p className="text-xs text-blue-700 dark:text-blue-300">
-                                        <strong>当前选择：</strong> {defaultViewMode === 'compact' ? '简约模式' : '详情模式'}
-                                    </p>
-                                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                                        新用户首次访问时将使用此视图模式
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 只有登录用户才显示的功能管理区域 */}
-                    {authToken && (
-                        <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
-                            <h4 className="font-bold dark:text-white mb-3 text-sm flex items-center gap-2">
-                                <Wrench size={16} /> 网站内容管理
-                            </h4>
-                            <p className="text-xs text-slate-500 mb-4">
-                                管理网站的书签、导入、备份和添加新链接等操作。
-                            </p>
-                            <div className="grid grid-cols-3 gap-3">
-                                <button
-                                    onClick={onImportClick}
-                                    className="flex flex-col items-center justify-center gap-2 p-3 text-sm text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 rounded-lg border border-slate-200 dark:border-slate-600 transition-all"
-                                    title="导入书签"
-                                >
-                                    <Upload size={18} />
-                                    <span>导入书签</span>
-                                </button>
-
-                                <button
-                                    onClick={onBackupClick}
-                                    className="flex flex-col items-center justify-center gap-2 p-3 text-sm text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 rounded-lg border border-slate-200 dark:border-slate-600 transition-all"
-                                    title="备份与恢复"
-                                >
-                                    <CloudCog size={18} />
-                                    <span>备份恢复</span>
-                                </button>
-
-                              </div>
-                        </div>
-                    )}
-                </div>
-            )}
-
-
+                </section>
+              )}
+            </>
+          )}
         </div>
 
-
-        {activeTab === 'website' && (
-            <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-3 shrink-0">
-                <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors">
-                    取消
-                </button>
-                <button
-                    onClick={handleSave}
-                    className="px-4 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2 font-medium"
-                >
-                    <Save size={16} /> 保存设置
-                </button>
-            </div>
-        )}
-
+        {/* Footer */}
+        <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-3 shrink-0">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors">取消</button>
+          <button onClick={handleSave} disabled={loading || saving} className="px-4 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 rounded-lg transition-colors flex items-center gap-2 font-medium">
+            {saving ? <Loader2 className="animate-spin w-4 h-4" /> : <Save size={16} />}
+            {saving ? '保存中...' : '保存设置'}
+          </button>
         </div>
+      </div>
     </div>
   );
 };

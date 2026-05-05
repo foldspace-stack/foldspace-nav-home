@@ -6,6 +6,8 @@
 
 .edgeone/
 
+.agents/
+
 content/
 !content/blog/
 !content/go.md
@@ -570,4 +572,6 @@ $RECYCLE.BIN/
 .edgeone/*
 !.edgeone/project.json
 .tef_dist/*
-  
+
+# KV 备份数据（包含敏感信息）
+kv/

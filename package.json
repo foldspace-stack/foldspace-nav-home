@@ -1,26 +1,28 @@
 {
-  "name": "蜗牛个人导航",
+  "name": "cloudnav",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.1",
   "type": "module",
-  "description": "A modern cloud-based navigation page built with React and TypeScript",
+  "description": "A modern cloud-based navigation page supporting EdgeOne, Cloudflare, and Vercel",
   "keywords": [
     "navigation",
     "bookmarks",
+    "edgeone",
     "cloudflare",
+    "vercel",
     "react",
     "typescript",
     "vite"
   ],
   "author": "eallion",
   "license": "MIT",
-  "homepage": "https://github.com/eallion/favorite-cloudflare",
+  "homepage": "https://github.com/eallion/favorite",
   "repository": {
     "type": "git",
-    "url": "https://github.com/eallion/favorite-cloudflare.git"
+    "url": "https://github.com/eallion/favorite.git"
   },
   "bugs": {
-    "url": "https://github.com/eallion/favorite-cloudflare/issues"
+    "url": "https://github.com/eallion/favorite/issues"
   },
   "engines": {
     "node": ">=18.0.0",
@@ -40,28 +42,29 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^8.0.0",
     "@dnd-kit/utilities": "^3.2.2",
-    "@google/genai": "^1.33.0",
+    "@google/genai": "^1.52.0",
+    "@vercel/kv": "^3.0.0",
     "buffer": "^6.0.3",
     "lucide-react": "^0.554.0",
-    "react": "^19.2.1",
-    "react-dom": "^19.2.1",
-    "uuid": "^13.0.0"
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "uuid": "^13.0.2"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.18",
-    "@types/node": "^22.19.2",
-    "@typescript-eslint/eslint-plugin": "^8.49.0",
-    "@typescript-eslint/parser": "^8.49.0",
-    "@vitejs/plugin-react": "^5.1.2",
-    "autoprefixer": "^10.4.22",
-    "eslint": "^9.39.1",
+    "@tailwindcss/postcss": "^4.3.0",
+    "@types/node": "^22.19.18",
+    "@typescript-eslint/eslint-plugin": "^8.59.2",
+    "@typescript-eslint/parser": "^8.59.2",
+    "@vitejs/plugin-react": "^5.2.0",
+    "autoprefixer": "^10.5.0",
+    "eslint": "^9.39.4",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "prettier": "^3.7.4",
-    "tailwindcss": "^4.1.18",
-    "terser": "^5.44.1",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "prettier": "^3.8.3",
+    "tailwindcss": "^4.3.0",
+    "terser": "^5.47.1",
     "typescript": "~5.8.3",
-    "vite": "^6.4.1"
+    "vite": "^6.4.2"
   }
 }

@@ -95,8 +95,18 @@ const BackupModal: React.FC<BackupModalProps> = ({
     downloadHtmlFile(html, `bookmarks_${dateStr}.html`);
   };
 
-  const handleExportJson = () => {
-    const data = { links, categories, searchConfig, aiConfig };
+  const handleExportJson = async () => {
+    // 也获取 config key 以备份所有设置
+    let appConfig = null;
+    try {
+      const res = await fetch('/api/storage?key=config');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.value) appConfig = JSON.parse(data.value);
+      }
+    } catch (e) { /* ignore */ }
+
+    const data = { links, categories, searchConfig, aiConfig, config: appConfig };
     const json = JSON.stringify(data, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);

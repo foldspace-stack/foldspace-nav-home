@@ -29,19 +29,27 @@ class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: '20px', color: 'red', border: '1px solid red', margin: '20px', backgroundColor: '#ffe6e6', zIndex: 9999, position: 'relative' }}>
-          <h2>Settings Page Crashed</h2>
-          <details style={{ whiteSpace: 'pre-wrap' }}>
+        <div style={{ padding: '20px', color: '#dc2626', border: '1px solid #fca5a5', margin: '20px', backgroundColor: '#fef2f2', borderRadius: '8px', zIndex: 9999, position: 'relative' }}>
+          <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '12px' }}>页面加载出错</h2>
+          <details style={{ whiteSpace: 'pre-wrap', fontSize: '13px', color: '#6b7280' }}>
             {this.state.error && this.state.error.toString()}
             <br />
             {this.state.errorInfo && this.state.errorInfo.componentStack}
           </details>
-          <button 
-            onClick={() => this.setState({ hasError: false })}
-            style={{ marginTop: '10px', padding: '5px 10px', cursor: 'pointer' }}
-          >
-            Try Again
-          </button>
+          <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+            <button
+              onClick={() => this.setState({ hasError: false })}
+              style={{ padding: '8px 16px', cursor: 'pointer', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '6px', fontSize: '14px' }}
+            >
+              重试
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              style={{ padding: '8px 16px', cursor: 'pointer', backgroundColor: '#e5e7eb', color: '#374151', border: 'none', borderRadius: '6px', fontSize: '14px' }}
+            >
+              刷新页面
+            </button>
+          </div>
         </div>
       );
     }

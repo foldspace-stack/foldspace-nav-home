@@ -1,44 +1,60 @@
+// 调试接口（需要认证）
+// 支持 EdgeOne Pages / Cloudflare Workers
+
+import { getKV, getCorsHeaders, verifyAuth, jsonResponse } from './_kvAdapter.js';
+
 export async function onRequest(context) {
+  const { request, env } = context;
+  const corsHeaders = getCorsHeaders(env);
+
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  // 认证检查（通过 query param 或 header）
+  const url = new URL(request.url);
+  const token = url.searchParams.get('token') || request.headers.get('x-auth-password');
+
+  const isAuthenticated = await verifyAuth({
+    providedPassword: token,
+    serverPassword: env.PASSWORD,
+    kv: getKV(env),
+  });
+
+  if (!isAuthenticated) {
+    return jsonResponse({ error: 'Unauthorized' }, 401, corsHeaders);
+  }
+
+  // 返回调试信息
   const result = {
     message: 'Debug Info',
     envKeys: {},
-    globalKV: 'Not Found'
+    kvStatus: 'Unknown',
   };
 
   try {
-    // Check env
-    if (context && context.env) {
-      for (const key in context.env) {
-        const value = context.env[key];
+    if (env) {
+      for (const key in env) {
+        const value = env[key];
         result.envKeys[key] = typeof value === 'string' ? 'String (Hidden)' : typeof value;
       }
     }
 
-    // Check Global KV (CLOUDNAV_KV)
     try {
-      if (typeof CLOUDNAV_KV !== 'undefined') {
-        result.globalKV = 'Present (Global)';
-        // test read
-        // const test = await CLOUDNAV_KV.get('test_key');
-      } else {
-         result.globalKV = 'Undefined';
-      }
+      const kv = getKV(env);
+      // 测试 KV 可读
+      await kv.get('__ping__');
+      result.kvStatus = 'OK';
     } catch (e) {
-      result.globalKV = `Error: ${e.message}`;
+      result.kvStatus = `Error: ${e.message}`;
     }
 
-    return new Response(JSON.stringify(result, null, 2), {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return jsonResponse(result, 200, corsHeaders);
 
   } catch (e) {
-    return new Response(JSON.stringify({
+    return jsonResponse({
       error: 'Exception in debug function',
       message: e.message,
-      stack: e.stack
-    }), {
-      status: 200, 
-      headers: { 'Content-Type': 'application/json' }
-    });
+    }, 500, corsHeaders);
   }
 }

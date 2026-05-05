@@ -6,17 +6,22 @@ export interface LinkItem {
   description?: string;
   categoryId: string;
   createdAt: number;
-  pinned?: boolean; // New field for pinning
-  pinnedOrder?: number; // Field for pinned link sorting order
+  pinned?: boolean;
+  pinnedOrder?: number;
+  order?: number;
+  weight?: number;
+  iconType?: string;
+  iconConfig?: Record<string, unknown>;
 }
 
 export interface Category {
   id: string;
   name: string;
-  icon: string; // Lucide icon name or emoji
-  password?: string; // Optional password for category protection
-  parentId?: string; // Parent category ID for subcategories
-  isSubcategory?: boolean; // Flag to identify if this is a subcategory
+  icon: string;
+  password?: string;
+  parentId?: string;
+  isSubcategory?: boolean;
+  weight?: number;
 }
 
 export interface AppState {
@@ -32,16 +37,18 @@ export interface WebDavConfig {
   enabled: boolean;
 }
 
-export type AIProvider = 'gemini' | 'openai';
+export type AIProvider = 'google' | 'openai' | 'claude';
 
 export interface AIConfig {
   provider: AIProvider;
   apiKey: string;
   baseUrl: string;
   model: string;
-  websiteTitle?: string; // 网站标题 (浏览器标签)
-  faviconUrl?: string; // 网站图标 URL
+  websiteTitle?: string;
+  faviconUrl?: string;
   navigationName?: string;
+  sidebarNavigationName?: string;
+  defaultViewMode?: 'compact' | 'detailed';
 }
 
 // 图标获取方式类型
@@ -100,26 +107,55 @@ export interface SearchConfig {
   mode: SearchMode;
   externalSources: ExternalSearchSource[];
   selectedSource?: ExternalSearchSource | null; // 选中的搜索源
+  defaultEngine?: string; // 默认搜索引擎 ID
+  customEngineUrl?: string; // 自定义搜索引擎 URL
 }
 
-// Mastodon 配置
-export interface MastodonConfig {
-  enabled: boolean; // 是否启用
-  instance: string; // Mastodon 实例域名，如 e5n.cc
-  username: string; // 用户名，如 eallion
-  limit: number; // 获取条数
-  exclude_replies: boolean; // 是否排除回复
-  exclude_reblogs: boolean; // 是否排除转嘟
-  pinned: boolean; // 是否包含置顶
+// 滚动 Ticker 来源类型
+export type TickerSource = 'mastodon' | 'memos' | 'custom';
+
+// 滚动 Ticker 配置
+export interface TickerConfig {
+  enabled: boolean;
+  source: TickerSource;
+  // Mastodon
+  mastodonInstance?: string;
+  mastodonUsername?: string;
+  mastodonLimit?: number;
+  mastodonExcludeReplies?: boolean;
+  mastodonExcludeReblogs?: boolean;
+  // Memos
+  memosHost?: string;
+  memosToken?: string;
+  memosLimit?: number;
+  memosCreator?: string;
+  memosVisibility?: 'PUBLIC' | 'PROTECTED' | 'PRIVATE';
+  // Custom
+  customItems?: string[];
 }
+
+// 天气 API 类型
+export type WeatherProvider = 'jinrishici' | 'qweather' | 'openweather' | 'visualcrossing' | 'accuweather';
 
 // 天气配置
 export interface WeatherConfig {
-  enabled: boolean; // 是否启用天气显示
-  apiHost: string; // 和风天气 API Host，如 devapi.qweather.com
-  apiKey: string; // 和风天气 API Key
-  location: string; // 位置 ID，如 101010100（北京）
-  unit: 'celsius' | 'fahrenheit'; // 温度单位
+  enabled: boolean;
+  provider: WeatherProvider;
+  // QWeather
+  qweatherHost?: string;
+  qweatherApiKey?: string;
+  qweatherLocation?: string;
+  // OpenWeather
+  openweatherApiKey?: string;
+  openweatherCity?: string;
+  // Visual Crossing
+  visualcrossingApiKey?: string;
+  visualcrossingLocation?: string;
+  // AccuWeather
+  accuweatherApiKey?: string;
+  accuweatherLocationKey?: string;
+  // Common
+  unit?: 'celsius' | 'fahrenheit';
 }
 
 // 完全统一的应用配置（包含所有配置）
@@ -136,8 +172,8 @@ export interface AppConfig {
   // 搜索配置
   search?: SearchConfig;
 
-  // Mastodon 配置
-  mastodon?: MastodonConfig;
+  // 滚动 Ticker 配置
+  ticker?: TickerConfig;
 
   // 天气配置
   weather?: WeatherConfig;

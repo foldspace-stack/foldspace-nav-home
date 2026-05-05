@@ -39,12 +39,17 @@ export default defineConfig(({ mode }) => {
         },
         rollupOptions: {
           output: {
-            manualChunks: {
-              vendor: ['react', 'react-dom'],
-              ui: ['lucide-react'],
-              dnd: ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
+            manualChunks(id) {
+              if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+                return 'vendor';
+              }
+              if (id.includes('node_modules/lucide-react/')) {
+                return 'ui';
+              }
+              if (id.includes('node_modules/@dnd-kit/')) {
+                return 'dnd';
+              }
             },
-            // 优化文件命名
             chunkFileNames: 'assets/[name]-[hash].js',
             entryFileNames: 'assets/[name]-[hash].js',
             assetFileNames: 'assets/[name]-[hash].[ext]',

@@ -14,16 +14,30 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onLogin, onClose }) => {
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async () => {
+    if (!password || isLoading) return;
     setIsLoading(true);
     setError('');
-    
-    const success = await onLogin(password);
-    if (!success) {
-      setError('密码错误或无法连接服务器');
+
+    try {
+      const success = await onLogin(password);
+      if (success) {
+        setPassword('');
+        onClose();
+      } else {
+        setError('密码错误或无法连接服务器');
+      }
+    } catch (e) {
+      setError('登录请求失败，请检查网络');
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleLogin();
+    }
   };
 
   return (
@@ -50,32 +64,34 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onLogin, onClose }) => {
             </p>
           </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-center tracking-widest"
-              placeholder="访问密码"
-              autoFocus
-            />
-          </div>
-
-          {error && (
-            <div className="text-red-500 text-sm text-center font-medium">
-              {error}
+          <div className="space-y-4">
+            <div>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-center tracking-widest"
+                placeholder="访问密码"
+                autoFocus
+              />
             </div>
-          )}
 
-          <button
-            type="submit"
-            disabled={isLoading || !password}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2"
-          >
-            {isLoading ? <Loader2 className="animate-spin" /> : <>解锁进入 <ArrowRight size={18} /></>}
-          </button>
-        </form>
+            {error && (
+              <div className="text-red-500 text-sm text-center font-medium">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleLogin}
+              disabled={isLoading || !password}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {isLoading ? <Loader2 className="animate-spin" /> : <>解锁进入 <ArrowRight size={18} /></>}
+            </button>
+          </div>
         </div>
       </div>
     </div>

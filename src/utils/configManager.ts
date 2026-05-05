@@ -1,11 +1,11 @@
-import { AppConfig, WebDavConfig, SearchConfig, IconConfig, AIConfig, WebsiteConfig, MastodonConfig, WeatherConfig } from '../types';
+import { AppConfig, WebDavConfig, SearchConfig, IconConfig, AIConfig, WebsiteConfig, TickerConfig, WeatherConfig } from '../types';
 import { STORAGE_KEYS } from '../constants';
 
 // 默认配置
 const DEFAULT_APP_CONFIG: AppConfig = {
   view: {
-    mode: 'compact',
-    defaultMode: 'compact',
+    mode: 'detailed',
+    defaultMode: 'detailed',
   },
   ui: {
     showPinnedWebsites: true,
@@ -18,6 +18,10 @@ const DEFAULT_APP_CONFIG: AppConfig = {
  */
 class ConfigManager {
   private config: AppConfig = DEFAULT_APP_CONFIG;
+
+  constructor() {
+    this.loadFromLocalStorage();
+  }
 
   /**
    * 从本地存储加载配置
@@ -135,16 +139,16 @@ class ConfigManager {
   /**
    * 更新 Mastodon 配置
    */
-  updateMastodonConfig(mastodonConfig: MastodonConfig): void {
-    this.config.mastodon = mastodonConfig;
+  updateMastodonConfig(tickerConfig: TickerConfig): void {
+    this.config.ticker = tickerConfig;
     this.saveToLocalStorage();
   }
 
   /**
-   * 获取 Mastodon 配置
+   * 获取 Ticker 配置
    */
-  getMastodonConfig(): MastodonConfig | undefined {
-    return this.config.mastodon;
+  getMastodonConfig(): TickerConfig | undefined {
+    return this.config.ticker;
   }
 
   /**
@@ -182,7 +186,7 @@ class ConfigManager {
    * 获取视图模式
    */
   getViewMode(): { mode: 'compact' | 'detailed'; defaultMode?: 'compact' | 'detailed' } {
-    return this.config.view || { mode: 'compact', defaultMode: 'compact' };
+    return this.config.view || { mode: 'detailed', defaultMode: 'detailed' };
   }
 
   /**
@@ -296,7 +300,7 @@ export const updateSearchConfig = (config: SearchConfig) => configManager.update
 export const getSearchConfig = () => configManager.getSearchConfig();
 export const updateIconConfig = (config: IconConfig) => configManager.updateIconConfig(config);
 export const getIconConfig = () => configManager.getIconConfig();
-export const updateMastodonConfig = (config: MastodonConfig) => configManager.updateMastodonConfig(config);
+export const updateMastodonConfig = (config: TickerConfig) => configManager.updateMastodonConfig(config);
 export const getMastodonConfig = () => configManager.getMastodonConfig();
 export const updateWeatherConfig = (config: WeatherConfig) => configManager.updateWeatherConfig(config);
 export const getWeatherConfig = () => configManager.getWeatherConfig();

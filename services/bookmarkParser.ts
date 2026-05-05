@@ -1,7 +1,6 @@
 import { LinkItem, Category } from '../types';
-import { v4 as uuidv4 } from 'uuid'; // Assuming uuid is available or we use a simple generator
 
-// Simple UUID generator fallback
+// Simple UUID generator
 const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2);
 };

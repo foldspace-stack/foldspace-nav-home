@@ -6,7 +6,7 @@ interface CardSkeletonProps {
 }
 
 const CardSkeleton: React.FC<CardSkeletonProps> = ({
-  viewMode = 'compact',
+  viewMode = 'detailed',
   count = 1
 }) => {
   const skeletons = Array.from({ length: count }, (_, i) => i);
@@ -16,31 +16,39 @@ const CardSkeleton: React.FC<CardSkeletonProps> = ({
       {skeletons.map((index) => (
         <div
           key={index}
-          className={`group relative bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 border border-gray-200 dark:border-gray-700 overflow-hidden animate-pulse ${
-            viewMode === 'detailed' ? 'p-4' : 'p-3'
+          className={`relative bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden ${
+            viewMode === 'detailed'
+              ? 'flex flex-col rounded-2xl p-4 min-h-[100px]'
+              : 'flex items-center rounded-xl p-3'
           }`}
+          style={{
+            animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            animationDelay: `${index * 50}ms`,
+          }}
         >
-          {/* 图标骨架 */}
-          <div className="flex items-start space-x-3">
-            <div className="w-8 h-8 bg-gray-200 dark:bg-gray-600 rounded-lg flex-shrink-0" />
-
-            {/* 内容骨架 */}
-            <div className="flex-1 min-w-0">
-              {/* 标题骨架 */}
-              <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-3/4 mb-2" />
-
-              {/* 描述骨架（仅在详细模式下显示） */}
-              {viewMode === 'detailed' && (
-                <div className="h-3 bg-gray-200 dark:bg-gray-600 rounded w-1/2" />
-              )}
+          {viewMode === 'detailed' ? (
+            <div className="flex flex-col md:flex-row md:items-start gap-3 w-full">
+              <div className="flex items-center gap-3 w-full md:hidden">
+                <div className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-slate-700 flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-3/4" />
+                </div>
+              </div>
+              <div className="w-full md:hidden">
+                <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-full" />
+              </div>
+              <div className="hidden md:flex w-14 h-14 rounded-2xl bg-slate-200 dark:bg-slate-700 flex-shrink-0" />
+              <div className="hidden md:flex flex-1 flex-col gap-2">
+                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-3/4" />
+                <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/2" />
+              </div>
             </div>
-
-            {/* 操作按钮骨架 */}
-            <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <div className="w-6 h-6 bg-gray-200 dark:bg-gray-600 rounded" />
-              <div className="w-6 h-6 bg-gray-200 dark:bg-gray-600 rounded" />
+          ) : (
+            <div className="flex items-center gap-3 w-full">
+              <div className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 flex-shrink-0" />
+              <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-2/3" />
             </div>
-          </div>
+          )}
         </div>
       ))}
     </>

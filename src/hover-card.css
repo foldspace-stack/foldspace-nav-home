@@ -3,7 +3,13 @@
   position: relative;
   overflow: hidden;
   transition: all 0.25s ease-out;
-  --icon-color: #3b82f6; /* 默认蓝色，可被 CSS 变量覆盖 */
+  --icon-color: #3b82f6;
+  --icon-color-rgb: 59, 130, 246;
+  border-color: transparent !important;
+}
+
+.link-card[data-color-ready] {
+  border-color: transparent !important;
 }
 
 .link-card .icon-bg {
@@ -48,43 +54,39 @@
   transform: scale(1.05);
 }
 
-/* Border glow effect on hover */
-.link-card::after {
+/* Hover: show color border + shadow */
+.link-card[data-color-ready]:hover {
+  border-color: rgba(var(--icon-color-rgb), 0.5) !important;
+  box-shadow:
+    0 0 0 1px rgba(var(--icon-color-rgb), 0.3),
+    0 10px 25px -5px rgba(var(--icon-color-rgb), 0.2),
+    0 4px 10px -4px rgba(var(--icon-color-rgb), 0.1);
+}
+
+.link-card[data-color-ready]:hover::after {
   content: '';
   position: absolute;
   pointer-events: none;
   inset: 0;
   border-radius: inherit;
-  border: 2px solid transparent;
-  -webkit-backdrop-filter: blur(0px) saturate(2) brightness(1.5) contrast(1.5);
-  backdrop-filter: blur(0px) saturate(2) brightness(1.5) contrast(1.5);
-  -webkit-mask: linear-gradient(#fff 0 100%) border-box, linear-gradient(#fff 0 100%) padding-box;
-  mask: linear-gradient(#fff 0 100%) border-box, linear-gradient(#fff 0 100%) padding-box;
-  -webkit-mask-composite: exclude;
-  mask-composite: exclude;
-  z-index: 3;
-  transform: translateZ(0);
-  transition: all 0.25s ease-out;
-}
-
-/* Hover effects with dynamic color */
-.link-card:hover {
-  border-color: rgba(var(--icon-color-rgb), 0.4);
-  box-shadow: 0 10px 25px -5px rgba(var(--icon-color-rgb), 0.15),
-              0 10px 10px -5px rgba(var(--icon-color-rgb), 0.04);
-}
-
-.link-card:hover::after {
-  border-color: rgba(var(--icon-color-rgb), 0.5);
   background: radial-gradient(
     800px circle at calc(var(--pointer-x, 0.5) * 100%) calc(var(--pointer-y, 0.5) * 100%),
-    rgba(var(--icon-color-rgb), 0.08) 0%,
+    rgba(var(--icon-color-rgb), 0.1) 0%,
     rgba(var(--icon-color-rgb), 0.04) 20%,
     transparent 40%
   );
+  z-index: 1;
 }
 
-/* Dark mode adjustments */
+/* Hover without color - blue fallback */
+.link-card:not([data-color-ready]):hover {
+  border-color: rgba(59, 130, 246, 0.4) !important;
+  box-shadow:
+    0 0 0 1px rgba(59, 130, 246, 0.2),
+    0 10px 25px -5px rgba(59, 130, 246, 0.15);
+}
+
+/* Dark mode */
 .dark .link-card .icon-bg {
   filter: blur(25px) saturate(4) brightness(1.4) contrast(1.5);
   opacity: 0.2;
@@ -99,24 +101,28 @@
   opacity: 0.4;
 }
 
-.dark .link-card::after {
-  border-color: rgba(var(--icon-color-rgb), 0.15);
+.dark .link-card[data-color-ready]:hover {
+  border-color: rgba(var(--icon-color-rgb), 0.6) !important;
+  box-shadow:
+    0 0 0 1px rgba(var(--icon-color-rgb), 0.4),
+    0 10px 25px -5px rgba(var(--icon-color-rgb), 0.3),
+    0 4px 10px -4px rgba(var(--icon-color-rgb), 0.15);
 }
 
-.dark .link-card:hover {
-  border-color: rgba(var(--icon-color-rgb), 0.5);
-  box-shadow: 0 10px 25px -5px rgba(var(--icon-color-rgb), 0.25),
-              0 10px 10px -5px rgba(var(--icon-color-rgb), 0.1);
-}
-
-.dark .link-card:hover::after {
-  border-color: rgba(var(--icon-color-rgb), 0.6);
+.dark .link-card[data-color-ready]:hover::after {
   background: radial-gradient(
     800px circle at calc(var(--pointer-x, 0.5) * 100%) calc(var(--pointer-y, 0.5) * 100%),
-    rgba(var(--icon-color-rgb), 0.12) 0%,
+    rgba(var(--icon-color-rgb), 0.15) 0%,
     rgba(var(--icon-color-rgb), 0.06) 20%,
     transparent 40%
   );
+}
+
+.dark .link-card:not([data-color-ready]):hover {
+  border-color: rgba(59, 130, 246, 0.5) !important;
+  box-shadow:
+    0 0 0 1px rgba(59, 130, 246, 0.3),
+    0 10px 25px -5px rgba(59, 130, 246, 0.2);
 }
 
 /* Performance optimization */
