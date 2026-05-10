@@ -51,10 +51,10 @@ interface ConfigContextValue extends ConfigState {
 
 // --- Defaults ---
 const defaultAI: AIConfig = {
-  provider: 'gemini',
+  provider: 'google',
   apiKey: '',
   baseUrl: '',
-  model: 'gemini-2.5-flash',
+  model: 'gemini-3.1-flash-lite',
 };
 
 const defaultWebsite: WebsiteConfig = {

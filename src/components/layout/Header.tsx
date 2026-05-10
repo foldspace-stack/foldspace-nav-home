@@ -7,15 +7,25 @@ import MastodonTicker from '../../../components/MastodonTicker';
 import WeatherDisplay from '../../../components/WeatherDisplay';
 import { useState, useRef, useEffect } from 'react';
 
-// Search Engine Icons
-const ENGINE_ICONS: Record<string, string> = {
-  google: 'https://www.google.com/favicon.ico',
-  bing: 'https://www.bing.com/favicon.ico',
-  baidu: 'https://www.baidu.com/favicon.ico',
-  duckduckgo: 'https://duckduckgo.com/favicon.ico',
-  yandex: 'https://yandex.com/favicon.ico',
-  so: 'https://www.so.com/favicon.ico',
-  custom: '', // Default to a globe or similar
+import { 
+  GoogleLogo, 
+  BingLogo, 
+  BaiduLogo, 
+  DuckDuckGoLogo, 
+  GithubLogo, 
+  YandexLogo, 
+  QihooLogo 
+} from '../icons/SearchLogos';
+
+// Search Engine Icons Mapping
+const ENGINE_LOGOS: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
+  google: GoogleLogo,
+  bing: BingLogo,
+  baidu: BaiduLogo,
+  duckduckgo: DuckDuckGoLogo,
+  github: GithubLogo,
+  yandex: YandexLogo,
+  so: QihooLogo,
 };
 
 interface HeaderProps {
@@ -39,6 +49,49 @@ interface HeaderProps {
   onToggleEditMode: () => void;
 }
 
+// Helper to render search engine logo
+function RenderEngineLogo({ 
+  engine, 
+  customIcon, 
+  isInternal, 
+  className = "" 
+}: { 
+  engine: string; 
+  customIcon?: string; 
+  isInternal: boolean;
+  className?: string;
+}) {
+  const LogoComponent = ENGINE_LOGOS[engine];
+  const filterClass = isInternal ? 'grayscale opacity-50' : 'grayscale-0 opacity-100';
+  const combinedClass = `${className} transition-all ${filterClass}`;
+
+  if (engine === 'custom' && customIcon) {
+    if (customIcon.trim().startsWith('<svg')) {
+      return (
+        <div 
+          className={combinedClass}
+          dangerouslySetInnerHTML={{ __html: customIcon }}
+          style={{ width: '16px', height: '16px' }}
+        />
+      );
+    }
+    return (
+      <img 
+        src={customIcon} 
+        alt="custom" 
+        className={combinedClass} 
+        style={{ width: '16px', height: '16px', objectFit: 'contain' }}
+      />
+    );
+  }
+
+  if (LogoComponent) {
+    return <LogoComponent className={combinedClass} style={{ width: '16px', height: '16px' }} />;
+  }
+
+  return <span className={`text-xs ${isInternal ? 'grayscale opacity-50' : ''}`}>🌐</span>;
+}
+
 export function Header({
   searchQuery, onSearchChange, isInternal, onInternalChange, onSearch, onAddLink, onOpenSettings,
   onOpenImport, onOpenAuth, onToggleSidebar, isBatchEditMode, onToggleBatchEditMode,
@@ -46,9 +99,11 @@ export function Header({
   isDragSortMode, onToggleDragSortMode,
   isEditMode, onToggleEditMode,
 }: HeaderProps) {
-  const { ai, darkMode, setDarkMode, viewMode, setViewMode, ticker, weather } = useConfigContext();
+  const { ai, darkMode, setDarkMode, viewMode, setViewMode, ticker, weather, search } = useConfigContext();
   const { authToken, logout } = useAuthContext();
   const { syncStatus } = useLinksContext();
+
+  const engine = search?.defaultEngine || 'google';
 
   return (
     <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-800/95 md:bg-white/80 md:dark:bg-slate-800/50 md:backdrop-blur-md border-b border-slate-200 dark:border-slate-700">
@@ -67,7 +122,17 @@ export function Header({
         {isMobileSearchOpen && (
           <div className="flex-1 flex items-center gap-2 md:hidden ml-2">
             <div className="relative flex-1">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <button
+                onClick={() => onInternalChange(!isInternal)}
+                className="absolute left-3 top-1/2 -translate-y-1/2 shrink-0 w-5 h-5 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
+                title={isInternal ? "切换到互联网搜索" : "切换到站内搜索"}
+              >
+                <RenderEngineLogo 
+                  engine={engine} 
+                  customIcon={search?.customEngineIcon} 
+                  isInternal={isInternal} 
+                />
+              </button>
               <input
                 id="search-input"
                 type="text"
@@ -278,7 +343,6 @@ function HeaderSearch({
   }, [isExpanded]);
 
   const engine = search?.defaultEngine || 'google';
-  const engineIcon = ENGINE_ICONS[engine] || '🌐';
 
   return (
     <div ref={containerRef} className="flex items-center justify-end">
@@ -297,15 +361,11 @@ function HeaderSearch({
             className="shrink-0 w-5 h-5 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform mr-2"
             title={isInternal ? "切换到互联网搜索" : "切换到站内搜索"}
           >
-            {engineIcon ? (
-              <img 
-                src={engineIcon} 
-                alt={engine} 
-                className={`w-4 h-4 transition-all ${isInternal ? 'grayscale opacity-50' : 'grayscale-0 opacity-100'}`} 
-              />
-            ) : (
-              <span className={`text-xs ${isInternal ? 'grayscale opacity-50' : ''}`}>🌐</span>
-            )}
+            <RenderEngineLogo 
+              engine={engine} 
+              customIcon={search?.customEngineIcon} 
+              isInternal={isInternal} 
+            />
           </button>
 
           <input

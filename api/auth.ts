@@ -1,6 +1,6 @@
 // Vercel 认证接口
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getKV, getCorsHeaders, generateSecureToken, calcExpiryTtl } from './_kvHelper';
+import { getKV, getCorsHeaders, generateSecureToken, calcExpiryTtl } from './_kvHelper.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const corsHeaders = getCorsHeaders();
@@ -19,6 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { password } = req.body;
 
     if (!process.env.PASSWORD) {
+      console.error('Environment variable PASSWORD is not set');
       return res.status(500).json({ error: '服务器未配置管理员密码' });
     }
 
@@ -30,12 +31,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let expirationTtl = 24 * 60 * 60;
     try {
-      const configStr = await kv.get('config');
-      if (configStr) {
-        const config = JSON.parse(configStr);
+      const configData = await kv.get('config');
+      if (configData) {
+        const config = typeof configData === 'string' ? JSON.parse(configData) : configData;
         const expiry = config.website?.passwordExpiry;
         if (expiry) {
-          expirationTtl = calcExpiryTtl(expiry);
+          expirationTtl = calcExpiryTtl(expiry) || 24 * 60 * 60;
         }
       }
     } catch (e) {
@@ -51,8 +52,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(200).json({ success: true, token, message: '认证成功' });
 
-  } catch (err) {
+  } catch (err: any) {
     console.error('Auth API error:', err);
-    return res.status(500).json({ error: '认证请求失败' });
+    return res.status(500).json({ error: '认证请求失败', details: err.message });
   }
 }
+

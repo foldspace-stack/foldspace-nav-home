@@ -15,7 +15,7 @@ interface SettingsData {
 }
 
 const DEFAULT_SETTINGS: SettingsData = {
-  ai: { provider: 'google', apiKey: '', baseUrl: '', model: 'gemini-2.5-flash', websiteTitle: '', navigationName: '', faviconUrl: '' },
+  ai: { provider: 'google', apiKey: '', baseUrl: '', model: 'gemini-3.1-flash-lite', websiteTitle: '', navigationName: '', faviconUrl: '' },
   passwordExpiry: { value: 1, unit: 'week' },
   ticker: { enabled: false, source: 'mastodon', customItems: [] },
   weather: { enabled: false, provider: 'jinrishici', unit: 'celsius' },
@@ -25,9 +25,9 @@ const DEFAULT_SETTINGS: SettingsData = {
 };
 
 const AI_MODELS: Record<string, { label: string; defaultModel: string; defaultBaseUrl: string }> = {
-  google: { label: 'Google Gemini', defaultModel: 'gemini-2.5-flash', defaultBaseUrl: 'https://generativelanguage.googleapis.com' },
-  openai: { label: 'OpenAI 兼容', defaultModel: 'gpt-4o', defaultBaseUrl: 'https://api.openai.com/v1' },
-  claude: { label: 'Claude', defaultModel: 'claude-sonnet-4-20250514', defaultBaseUrl: 'https://api.anthropic.com' },
+  google: { label: 'Google Gemini', defaultModel: 'gemini-3.1-flash-lite', defaultBaseUrl: 'https://generativelanguage.googleapis.com' },
+  openai: { label: 'OpenAI', defaultModel: 'gpt-5-nano', defaultBaseUrl: 'https://api.openai.com/v1' },
+  claude: { label: 'Claude', defaultModel: 'claude-haiku-4-5', defaultBaseUrl: 'https://api.anthropic.com' },
 };
 
 interface SettingsModalProps {
@@ -240,16 +240,28 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     <p className="text-[10px] text-slate-400 mt-1">未勾选“站内搜索”时使用的外部搜索引擎。</p>
                   </div>
                   {settings.search.defaultEngine === 'custom' && (
-                    <div>
-                      <label className="block text-xs font-medium text-slate-500 mb-1">自定义搜索 URL</label>
-                      <input 
-                        type="text" 
-                        value={settings.search.customEngineUrl || ''} 
-                        onChange={(e) => update('search', { ...settings.search, customEngineUrl: e.target.value })} 
-                        placeholder="https://example.com/search?q=" 
-                        className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" 
-                      />
-                      <p className="text-[10px] text-slate-400 mt-1">请输入搜索 URL，关键词将拼接在末尾。</p>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">自定义搜索 URL</label>
+                        <input 
+                          type="text" 
+                          value={settings.search.customEngineUrl || ''} 
+                          onChange={(e) => update('search', { ...settings.search, customEngineUrl: e.target.value })} 
+                          placeholder="https://example.com/search?q=" 
+                          className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" 
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">请输入搜索 URL，关键词将拼接在末尾。</p>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">自定义 Logo (URL 或 SVG 代码)</label>
+                        <textarea 
+                          value={settings.search.customEngineIcon || ''} 
+                          onChange={(e) => update('search', { ...settings.search, customEngineIcon: e.target.value })} 
+                          placeholder="https://example.com/logo.png 或 <svg>...</svg>" 
+                          className="w-full h-24 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none text-xs" 
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">支持图片 URL 或直接输入 SVG 代码。</p>
+                      </div>
                     </div>
                   )}
                 </div>

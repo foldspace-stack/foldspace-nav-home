@@ -67,7 +67,7 @@ export const generateLinkDescription = async (title: string, url: string, config
   try {
     if (config.provider === 'google') {
         const ai = new GoogleGenAI({ apiKey: config.apiKey });
-        const modelName = config.model || 'gemini-2.5-flash';
+        const modelName = config.model || 'gemini-3.1-flash-lite';
         
         const response: GenerateContentResponse = await ai.models.generateContent({
             model: modelName,
@@ -109,9 +109,9 @@ export const suggestCategory = async (title: string, url: string, categories: {i
     `;
 
     try {
-        if (config.provider === 'gemini') {
+        if (config.provider === 'google') {
             const ai = new GoogleGenAI({ apiKey: config.apiKey });
-            const modelName = config.model || 'gemini-2.5-flash';
+            const modelName = config.model || 'gemini-3.1-flash-lite';
             
             const response: GenerateContentResponse = await ai.models.generateContent({
                 model: modelName,

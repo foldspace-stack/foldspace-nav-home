@@ -1,6 +1,6 @@
 // Vercel WebDAV 代理接口
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getCorsHeaders } from './_kvHelper';
+import { getCorsHeaders } from './_kvHelper.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const corsHeaders = getCorsHeaders();

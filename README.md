@@ -27,6 +27,9 @@
 
 你可以配合 **Chrome** /  **Firefox** 浏览器插件来快速添加书签：
 
+- [eallion/chrome-extension-favorite](https://github.com/eallion/chrome-extension-favorite)
+- [eallion/firefox-extension-favorite](https://github.com/eallion/firefox-extension-favorite)
+
 [![](screenshots/ChromeStore.png)](https://github.com/eallion/chrome-extension-favorite) [![](screenshots/FirefoxAddon.png)](https://github.com/eallion/firefox-extension-favorite)
 
 ## 🏗️ 技术架构
@@ -38,14 +41,14 @@
 - Vite
 - Tailwind CSS 4
 
-#### Serverless
+#### Serverless / Storage
 
-- EdgeOne Pages
-- Cloudflare Pages [wip]
-- Vercel [wip]
+- **EdgeOne Pages**: Edge Functions + EdgeOne KV
+- **Cloudflare Pages**: Pages Functions + Cloudflare KV
+- **Vercel**: Vercel Functions + Vercel KV (Upstash Redis)
 
 ```
-┌─────────────────────────────────────────────┐
+┌──────────────────────────────────────────────┐
 │               Browser (Client)               │
 │                                              │
 │  React 19 + TypeScript + Tailwind CSS 4      │
@@ -57,36 +60,51 @@
 └──────────────────┬───────────────────────────┘
                    │ HTTP API
 ┌──────────────────┴───────────────────────────┐
-│       EdgeOne Pages Functions + KV            │
+│     EdgeOne / Cloudflare / Vercel Backend    │
 │                                              │
 │  KV 存储：links:{category_id} 按分类拆分     │
-│  认证：安全随机 Token + 自动清理旧 Token      │
-│  平台适配：_kvAdapter.js 自动检测运行环境    │
+│  认证：安全随机 Token + 自动清理旧 Token     │
+│  平台适配：多平台 KV 接口抽象（屏蔽底层差异）│
 └──────────────────────────────────────────────┘
 ```
 
 ## 🚀 部署指南
 
-### EdgeOne Pages
+### EdgeOne Pages (推荐)
 
-1. Fork 或克隆本仓库
-2. 在 EdgeOne 控制台创建 Pages 项目
+1. Fork 或克隆本仓库。
+2. 在 EdgeOne 控制台创建 Pages 项目。
 3. 构建设置：
    - 框架预设：`Vite`
    - 输出目录：`./dist`
    - 安装命令：`pnpm install`
    - 编译命令：`pnpm build`
-4. 绑定 KV：
-   - 创建 KV 命名空间
-   - 变量名称：`CLOUDNAV_KV`
-5. 环境变量：
-   - `PASSWORD`：管理后台登录密码
-   - `ALLOWED_ORIGIN`：CORS 允许的域名（可选）
-6. 重新部署
+4. 绑定 KV：创建 KV 命名空间，变量名称设为 `CLOUDNAV_KV`。
+5. 环境变量：设置 `PASSWORD`（管理密码）。
 
-### Cloudflare Pages / Vercel
+### Cloudflare Pages
 
-> Cloudflare Pages 和 Vercel 的部署支持正在开发中，API 函数代码在 `api/` 目录。
+1. 在 Cloudflare 控制台创建 Pages 项目，连接 GitHub 仓库。
+2. 构建设置：框架预设选择 `Other`，安装命令 `pnpm install`，输出目录 `dist`。
+3. 创建并绑定 KV：
+   - 导航至 **Workers & Pages** -> **KV** -> **Create a namespace**。
+   - 名字设为 `CLOUDNAV_KV`。
+   - 回到 Pages 项目设置 -> **Settings** -> **Functions** -> **KV namespace bindings**。
+   - 添加绑定：变量名称设为 `CLOUDNAV_KV`，选择刚才创建的命名空间。
+4. 环境变量：
+   - 在项目设置 -> **Environment variables** 中添加 `PASSWORD`（管理密码）。
+5. 重新部署。
+
+### Vercel
+
+1. 在 Vercel 控制台导入 GitHub 仓库，框架预设选择 `Vite`。
+2. 创建并连接 KV：
+   - 在项目顶部菜单点击 **Storage** -> **Create Database** -> **Upstash for Redis**。
+   - 创建成功后，点击 **Connect** 按钮将其绑定到本项目。
+   - Vercel 会自动注入 `KV_URL` 等环境变量。
+3. 环境变量：
+   - 在项目 **Settings** -> **Environment Variables** 中手动添加 `PASSWORD`。
+4. 重新部署。
 
 ## ⚙️ 环境变量
 
@@ -95,70 +113,57 @@
 | `PASSWORD` | 管理后台登录密码 | 是 | - |
 | `ALLOWED_ORIGIN` | CORS 允许的域名 | 否 | `*` |
 
-![](screenshots/edgeone_dash.png)
-
 ## 🛠️ 本地开发
 
 ```bash
 # 安装依赖
 pnpm install
 
-# 启动 Vite 开发服务器 (localhost:3000，仅前端)
+# 1. 启动 Vite 开发服务器 (localhost:3000，仅前端)
 pnpm dev
 
-# 链接 EdgeOne Pages KV
-edgeone pages link
-
-# 使用 EdgeOne Pages 本地开发（含 Functions + KV）
+# 2. 模拟 EdgeOne 环境 (需安装 edgeone cli)
 edgeone pages dev
 
-# 构建生产版本
+# 3. 模拟 Cloudflare 环境 (需安装 wrangler)
 pnpm build
+wrangler pages dev ./dist --kv CLOUDNAV_KV
 
-# 代码检查
-pnpm lint
-
-# 类型检查
-pnpm type-check
+# 4. 模拟 Vercel 环境 (需安装 vercel cli)
+# 需要先运行 vercel env pull .env.local 拉取云端 KV 变量
+vercel dev
 ```
 
-### 数据存储
+### 数据存储说明
 
-- **KV Key 结构**：链接按分类拆分存储，key 格式为 `links:{category_id}`
-- **本地开发**：使用 EdgeOne CLI 的本地 KV 模拟，或 `src/utils/kvMock.ts`
-- **首次部署**：使用 `types.ts` 中的 `INITIAL_LINKS` 和 `DEFAULT_CATEGORIES` 作为初始数据
+- **KV Key 结构**：链接按分类拆分存储，key 格式为 `links:{category_id}`。
+- **本地模拟**：EdgeOne 使用 CLI 模拟 KV；Vercel 需连接云端测试 KV 或使用 `kvMock.ts`。
+- **首次部署**：系统会使用 `types.ts` 中的 `INITIAL_LINKS` 作为初始演示数据。
 
 ## 📁 项目结构
 
 ```
-├── api/                       # Cloudflare/Vercel Serverless Functions (TypeScript)
-├── components/                # 通用 UI 组件与弹窗 (Modal, Toast, ErrorBoundary, 小组件等)
-├── functions/api/             # EdgeOne Pages Serverless Functions (JavaScript)
-├── services/                  # 业务服务层 (AI, 书签解析, 导出, WebDAV, 图标获取等)
+├── api/                       # Vercel Serverless Functions (TypeScript)
+├── functions/api/             # EdgeOne / Cloudflare Pages Functions (JavaScript)
+├── components/                # 通用 UI 组件 (Modal, Toast, ErrorBoundary, 小组件等)
+├── services/                  # 前端业务逻辑 (AI, 书签解析, 导出, WebDAV 等)
 ├── src/
-│   ├── components/            # 页面核心业务组件
-│   │   ├── layout/            # 布局 (AppLayout, Sidebar, Header, MainContent, ContentSkeleton)
-│   │   ├── category/          # 分类 (CategorySection)
-│   │   └── link/              # 链接 (LinkCard, PinnedSection)
+│   ├── components/            # 核心业务组件 (layout, category, link)
 │   ├── contexts/              # React Context 状态管理 (Auth, Links, Categories, Config)
 │   ├── hooks/                 # 自定义 Hooks (Search, DragSort, DataSync)
 │   ├── utils/                 # 工具函数 (Config, Security, ColorExtractor)
-│   ├── constants/             # 常量定义
-│   └── *.css                  # 样式文件 (index.css, hover-card.css)
-├── public/                    # 静态资源 (Manifest, Favicon, Robots, Sitemap 等)
-├── App.tsx                    # 应用入口 (Provider 组合层)
-├── index.tsx                  # Web 入口文件
-├── index.html                 # HTML 入口 (SEO & CSP 配置)
-├── types.ts                   # TypeScript 类型定义 & 初始数据
-├── pnpm-lock.yaml             # pnpm 锁文件
-├── package.json               # 项目依赖与脚本
-├── vite.config.ts             # Vite 构建配置
-├── tailwind.config.js         # Tailwind CSS 配置
-├── edgeone.json               # EdgeOne Pages 配置
-├── wrangler.toml              # Cloudflare Pages 配置
+│   └── constants/             # 常量定义
+├── public/                    # 静态资源
+├── App.tsx                    # 应用入口
+├── types.ts                   # 类型定义 & 初始数据
 ├── vercel.json                # Vercel 部署配置
-└── tsconfig.json              # TypeScript 全局配置
+├── edgeone.json               # EdgeOne Pages 配置
+└── package.json               # 项目依赖
 ```
+
+## Inspiration
+
+- [CloudNav-abcd](https://github.com/aabacada/CloudNav-abcd)
 
 ## 📄 License
 

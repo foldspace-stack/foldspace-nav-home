@@ -1,6 +1,6 @@
 // Vercel 链接添加接口
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getKV, getCorsHeaders, verifyAuth } from './_kvHelper';
+import { getKV, getCorsHeaders, verifyAuth } from './_kvHelper.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const corsHeaders = getCorsHeaders();
@@ -31,10 +31,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Missing title or url' });
     }
 
-    const linksStr = await kv.get('links_config');
     const catsStr = await kv.get('cate_config');
-    const links = linksStr ? JSON.parse(linksStr as string) : [];
-    const categories = catsStr ? JSON.parse(catsStr as string) : [];
+    const categories = catsStr ? (typeof catsStr === 'string' ? JSON.parse(catsStr) : catsStr) : [];
 
     let targetCatId = '';
     let targetCatName = '';
@@ -83,8 +81,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       icon: newLinkData.icon || undefined,
     };
 
-    const updatedLinks = [newLink, ...links];
-    await kv.set('links_config', JSON.stringify(updatedLinks));
+    // 读取该分类的现有链接 (分 key 存储)
+    const existingStr = await kv.get(`links:${targetCatId}`);
+    const existing = existingStr ? (typeof existingStr === 'string' ? JSON.parse(existingStr) : existingStr) : [];
+
+    const updatedLinks = [newLink, ...existing];
+    await kv.set(`links:${targetCatId}`, JSON.stringify(updatedLinks));
 
     return res.status(200).json({
       success: true,
@@ -97,3 +99,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: err.message });
   }
 }
+

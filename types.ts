@@ -109,6 +109,7 @@ export interface SearchConfig {
   selectedSource?: ExternalSearchSource | null; // 选中的搜索源
   defaultEngine?: string; // 默认搜索引擎 ID
   customEngineUrl?: string; // 自定义搜索引擎 URL
+  customEngineIcon?: string; // 自定义搜索引擎 Logo (URL 或 SVG 代码)
 }
 
 // 滚动 Ticker 来源类型
