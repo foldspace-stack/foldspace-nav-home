@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Cloud, Download, Upload, CheckCircle2, AlertCircle, RefreshCw, Save } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Cloud, Download, Upload, CheckCircle2, AlertCircle, RefreshCw, Save, FolderUp } from 'lucide-react';
 import { Category, LinkItem, WebDavConfig, SearchConfig, AIConfig } from '../types';
 import { checkWebDavConnection, uploadBackup, downloadBackup } from '../services/webDavService';
 import { generateBookmarkHtml, downloadHtmlFile } from '../services/exportService';
@@ -26,12 +26,17 @@ const BackupModal: React.FC<BackupModalProps> = ({
   const [testResult, setTestResult] = useState<'success' | 'fail' | null>(null);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'uploading' | 'downloading' | 'success' | 'error'>('idle');
   const [statusMsg, setStatusMsg] = useState('');
+  const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [importMsg, setImportMsg] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if(isOpen) {
         setConfig(webDavConfig);
         setTestResult(null);
         setSyncStatus('idle');
+        setImportStatus('idle');
+        setImportMsg('');
     }
   }, [isOpen, webDavConfig]);
 
@@ -117,6 +122,58 @@ const BackupModal: React.FC<BackupModalProps> = ({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const handleImportJson = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target?.result as string);
+
+        // 验证备份文件基本结构
+        if (!Array.isArray(data.links) || !Array.isArray(data.categories)) {
+          setImportStatus('error');
+          setImportMsg('无效的备份文件：缺少 links 或 categories 数据。');
+          return;
+        }
+
+        if (!confirm(
+          `确定要导入备份吗？\n\n` +
+          `将导入 ${data.links.length} 个链接和 ${data.categories.length} 个分类。\n\n` +
+          `⚠️ 这将覆盖当前的所有本地数据。`
+        )) {
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          return;
+        }
+
+        // 恢复链接和分类
+        onRestore(data.links, data.categories);
+
+        // 恢复搜索配置
+        if (data.searchConfig) {
+          onRestoreSearchConfig(data.searchConfig);
+        }
+
+        // 恢复 AI 配置
+        if (data.aiConfig) {
+          onRestoreAIConfig(data.aiConfig);
+        }
+
+        setImportStatus('success');
+        setImportMsg(`导入成功！已恢复 ${data.links.length} 个链接和 ${data.categories.length} 个分类。`);
+      } catch (err) {
+        setImportStatus('error');
+        setImportMsg('解析备份文件失败，请确认文件格式正确。');
+      }
+
+      // 重置 file input
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    reader.readAsText(file);
   };
 
   if (!isOpen) return null;
@@ -242,9 +299,9 @@ const BackupModal: React.FC<BackupModalProps> = ({
 
             <hr className="border-slate-200 dark:border-slate-700" />
 
-             {/* Section 3: HTML Export */}
+             {/* Section 3: Local Export & Import */}
              <section className="space-y-4">
-                <h4 className="font-medium text-slate-800 dark:text-slate-200">本地导出</h4>
+                <h4 className="font-medium text-slate-800 dark:text-slate-200">本地导出与恢复</h4>
                 <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/30 flex items-center justify-between">
                     <div>
                         <h5 className="text-sm font-medium dark:text-slate-200">导出 HTML 书签文件</h5>
@@ -270,6 +327,36 @@ const BackupModal: React.FC<BackupModalProps> = ({
                         <Download size={16} /> 导出 JSON
                     </button>
                 </div>
+
+                <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 flex items-center justify-between">
+                    <div>
+                        <h5 className="text-sm font-medium dark:text-slate-200">导入 cloudnav_backup.json 恢复</h5>
+                        <p className="text-xs text-slate-500 mt-1">从本地 JSON 备份文件恢复所有数据（链接、分类、搜索和 AI 配置）</p>
+                    </div>
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".json"
+                        onChange={handleImportJson}
+                        className="hidden"
+                        id="import-json-input"
+                    />
+                    <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shrink-0"
+                    >
+                        <FolderUp size={16} /> 导入 JSON
+                    </button>
+                </div>
+
+                {importStatus !== 'idle' && (
+                    <div className={`text-sm text-center p-2 rounded ${
+                        importStatus === 'success' ? 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400' : 
+                        'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400'
+                    }`}>
+                        {importMsg}
+                    </div>
+                )}
              </section>
 
         </div>
