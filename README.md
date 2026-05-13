@@ -18,7 +18,7 @@
 - **安全管理**：安全随机 Token 鉴权，登录时自动清理旧 Token，支持密码过期时间配置
 - **AI 辅助**：集成 Gemini / OpenAI 兼容 API，自动填充链接描述、智能分类建议
 - **数据导入导出**：Chrome 书签 HTML / JSON 备份 / WebDAV 云同步
-- **丰富小组件**：实时天气（和风天气）、Mastodon 动态滚动条
+- **丰富小组件**：Mastodon / Memos 动态滚动条、实时天气（和风天气）
 - **个性化**：深色/浅色模式（自动检测系统偏好）、紧凑/详细视图、自定义图标
 - **卡片动效**：从图标提取主色调，hover 时显示彩色边框 and 光晕
 - **骨架屏加载**：加载时显示骨架屏占位，卡片交错淡入动画
@@ -85,7 +85,10 @@
 ### Cloudflare Pages
 
 1. 在 Cloudflare 控制台创建 Pages 项目，连接 GitHub 仓库。
-2. 构建设置：框架预设选择 `Other`，安装命令 `pnpm install`，输出目录 `dist`。
+2. 构建设置：
+   - 框架预设选择 `Other`
+   - 安装命令 `pnpm install`
+   - 输出目录 `dist`。
 3. 创建并绑定 KV：
    - 导航至 **Workers & Pages** -> **KV** -> **Create a namespace**。
    - 名字设为 `CLOUDNAV_KV`。
@@ -123,6 +126,7 @@ pnpm install
 pnpm dev
 
 # 2. 模拟 EdgeOne 环境 (需安装 edgeone cli)
+edgeone pages link
 edgeone pages dev
 
 # 3. 模拟 Cloudflare 环境 (需安装 wrangler)
@@ -167,4 +171,29 @@ vercel dev
 
 ## 📄 License
 
-本项目采用 [MIT License](LICENSE) 开源。
+本项目采用 [GLWTPL License](https://github.com/me-shaon/GLWTPL) 开源。
+
+```
+GLWT（Good Luck With That，祝你好运）公共许可证
+            版权所有© 除作者外的所有人
+
+任何人都被允许复制、分发、修改、合并、销售、出版、再授权
+或任何其它行为，但风险自负。
+
+作者对这个项目中的代码的行为一无所知。
+代码处于可用或不可用状态，没有第三种可能
+
+
+                祝你好运公共许可证
+            复制、分发和修改的条款和条件
+
+  0. 只要你永远不要留下任何可以追踪到原作者的线索，
+你就可以随心所欲地做任何事，因此，不能因此责怪或追究
+原作者的责任。
+
+在任何情况下，作者均不对因使用或与本软件有关的合同诉讼、
+侵权或其他方式产生的任何索赔、损害或其他责任负责。
+
+自求多福吧。
+```
+
