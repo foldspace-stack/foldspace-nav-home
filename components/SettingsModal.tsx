@@ -15,7 +15,20 @@ interface SettingsData {
 }
 
 const DEFAULT_SETTINGS: SettingsData = {
-  ai: { provider: 'google', apiKey: '', baseUrl: '', model: 'gemini-3.1-flash-lite', websiteTitle: '', navigationName: '', faviconUrl: '' },
+  ai: { 
+    provider: 'google', 
+    apiKey: '', 
+    baseUrl: 'https://generativelanguage.googleapis.com', 
+    model: 'gemini-3.1-flash-lite', 
+    websiteTitle: '', 
+    navigationName: '', 
+    faviconUrl: '',
+    providers: {
+      google: { apiKey: '', baseUrl: 'https://generativelanguage.googleapis.com', model: 'gemini-3.1-flash-lite' },
+      openai: { apiKey: '', baseUrl: 'https://api.openai.com/v1', model: 'gpt-5-nano' },
+      claude: { apiKey: '', baseUrl: 'https://api.anthropic.com', model: 'claude-haiku-4-5' },
+    }
+  },
   passwordExpiry: { value: 1, unit: 'week' },
   ticker: { enabled: false, source: 'mastodon', customItems: [] },
   weather: { enabled: false, provider: 'jinrishici', unit: 'celsius' },
@@ -59,9 +72,24 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         if (data?.value) {
           // Mapping AppConfig to SettingsData structure
           const appConfig = JSON.parse(data.value);
+          
+          // Ensure providers map exists
+          const aiConfig = appConfig.ai || DEFAULT_SETTINGS.ai;
+          if (!aiConfig.providers) {
+            aiConfig.providers = { ...DEFAULT_SETTINGS.ai.providers };
+            // Migration: put current active settings into the map
+            if (aiConfig.provider && aiConfig.providers[aiConfig.provider]) {
+              aiConfig.providers[aiConfig.provider] = {
+                apiKey: aiConfig.apiKey || '',
+                baseUrl: aiConfig.baseUrl || AI_MODELS[aiConfig.provider]?.defaultBaseUrl || '',
+                model: aiConfig.model || AI_MODELS[aiConfig.provider]?.defaultModel || '',
+              };
+            }
+          }
+
           setSettings(prev => ({
             ...prev,
-            ai: appConfig.ai || prev.ai,
+            ai: aiConfig,
             passwordExpiry: appConfig.website?.passwordExpiry || prev.passwordExpiry,
             ticker: appConfig.ticker || appConfig.mastodon || prev.ticker,
             weather: appConfig.weather || prev.weather,
@@ -135,8 +163,40 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     setSettings(prev => ({ ...prev, [key]: value }));
   };
 
-  const updateAI = (key: keyof AIConfig, value: string) => {
-    setSettings(prev => ({ ...prev, ai: { ...prev.ai, [key]: value } }));
+  const updateAI = (key: keyof AIConfig, value: any) => {
+    setSettings(prev => {
+      const newAi = { ...prev.ai, [key]: value };
+      
+      // If updating provider, load stored settings for new provider
+      if (key === 'provider') {
+        const provider = value as keyof typeof AI_MODELS;
+        const stored = newAi.providers?.[provider];
+        if (stored) {
+          newAi.apiKey = stored.apiKey;
+          newAi.baseUrl = stored.baseUrl;
+          newAi.model = stored.model;
+        } else {
+          // Fallback to defaults if no stored config
+          const defaults = AI_MODELS[provider];
+          if (defaults) {
+            newAi.apiKey = '';
+            newAi.baseUrl = defaults.defaultBaseUrl;
+            newAi.model = defaults.defaultModel;
+          }
+        }
+      } 
+      // If updating specific field, sync with providers map
+      else if (['apiKey', 'baseUrl', 'model'].includes(key as string)) {
+        const provider = newAi.provider;
+        if (!newAi.providers) newAi.providers = {};
+        newAi.providers[provider] = {
+          ...(newAi.providers[provider] || { apiKey: '', baseUrl: '', model: '' }),
+          [key]: value
+        };
+      }
+      
+      return { ...prev, ai: newAi };
+    });
   };
 
   const handleLogout = () => {
@@ -508,13 +568,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       {settings.ai.provider === 'claude' && <a href="https://docs.anthropic.com/en/api/getting-started" target="_blank" rel="noreferrer" className="text-[10px] text-blue-500 hover:underline">Claude API</a>}
                     </div>
                     <select value={settings.ai.provider} onChange={(e) => {
-                      const provider = e.target.value as keyof typeof AI_MODELS;
-                      const defaults = AI_MODELS[provider];
-                      updateAI('provider', provider);
-                      if (defaults) {
-                        updateAI('model', defaults.defaultModel);
-                        updateAI('baseUrl', defaults.defaultBaseUrl);
-                      }
+                      updateAI('provider', e.target.value as any);
                     }} className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none">
                       {Object.entries(AI_MODELS).map(([key, val]) => (
                         <option key={key} value={key}>{val.label}</option>

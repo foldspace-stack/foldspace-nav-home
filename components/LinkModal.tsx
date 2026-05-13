@@ -31,6 +31,8 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
   const [autoFetchIcon, setAutoFetchIcon] = useState(true);
   const [batchMode, setBatchMode] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [weight, setWeight] = useState(0);
+  const [pinnedOrder, setPinnedOrder] = useState(0);
   
   // 当模态框关闭时，重置批量模式为默认关闭状态
   useEffect(() => {
@@ -82,10 +84,14 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
         setCategoryId(initialData.categoryId);
         setPinned(initialData.pinned || false);
         setIcon(initialData.icon || '');
+        setWeight(initialData.weight || 0);
+        setPinnedOrder(initialData.pinnedOrder || 0);
       } else {
         setTitle('');
         setUrl('');
         setDescription('');
+        setWeight(0);
+        setPinnedOrder(0);
         // 如果有默认分类ID，使用它；否则使用第一个可用的分类
         if (defaultCategoryId && categories.find(cat => cat.id === defaultCategoryId)) {
           setCategoryId(defaultCategoryId);
@@ -172,7 +178,9 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
       icon,
       description,
       categoryId,
-      pinned
+      pinned,
+      weight,
+      pinnedOrder
     });
     
     // 如果有自定义图标URL，缓存到KV空间
@@ -534,6 +542,32 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
                 ))}
             </select>
           </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1 dark:text-slate-300">权重 (Weight)</label>
+            <input
+              type="number"
+              value={weight}
+              onChange={(e) => setWeight(parseInt(e.target.value) || 0)}
+              className="w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+              placeholder="数值越小越靠前"
+            />
+            <p className="text-[10px] text-slate-400 mt-1">控制在分类中的排序，数值越小越靠前。</p>
+          </div>
+
+          {pinned && (
+            <div>
+              <label className="block text-sm font-medium mb-1 dark:text-slate-300">置顶权重 (Pinned Order)</label>
+              <input
+                type="number"
+                value={pinnedOrder}
+                onChange={(e) => setPinnedOrder(parseInt(e.target.value) || 0)}
+                className="w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                placeholder="数值越小越靠前"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">控制在置顶区域的排序，数值越小越靠前。</p>
+            </div>
+          )}
 
           <div className="pt-2 relative">
             {/* 成功提示 */}

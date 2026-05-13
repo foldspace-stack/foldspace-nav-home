@@ -30,7 +30,10 @@ export function AppLayout() {
   const { ai: aiConfig, icon: iconConfig, viewMode, showPinnedWebsites, ticker, weather, website, webdav, search, setAI, setWebsite, setShowPinned, setMastodon, setWeather, setWebDav, setSearch, setViewMode } = useConfigContext();
 
   // Hooks
-  const { searchQuery, setSearchQuery, searchResults, isMobileSearchOpen, setIsMobileSearchOpen, isInternal, setIsInternal, handleSearch } = useSearch();
+  const { 
+    searchQuery, setSearchQuery, searchResults, isMobileSearchOpen, setIsMobileSearchOpen, 
+    isInternal, setIsInternal, handleSearch, visitorEngineId, setVisitorEngineId 
+  } = useSearch();
   const { initData } = useDataSync();
 
   // UI State
@@ -328,6 +331,8 @@ export function AppLayout() {
           onToggleDragSortMode={toggleDragSortMode}
           isEditMode={isEditMode}
           onToggleEditMode={toggleEditMode}
+          visitorEngineId={visitorEngineId}
+          onVisitorEngineChange={setVisitorEngineId}
         />
 
         <MainContent

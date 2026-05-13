@@ -37,13 +37,18 @@ export interface WebDavConfig {
   enabled: boolean;
 }
 
-export type AIProvider = 'google' | 'openai' | 'claude';
+export interface AIProviderConfig {
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+}
 
 export interface AIConfig {
   provider: AIProvider;
   apiKey: string;
   baseUrl: string;
   model: string;
+  providers?: Partial<Record<AIProvider, AIProviderConfig>>;
   websiteTitle?: string;
   faviconUrl?: string;
   navigationName?: string;
