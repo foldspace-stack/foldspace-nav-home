@@ -22,9 +22,10 @@ interface TickerItem {
 
 interface TickerProps {
   config?: TickerConfig;
+  isCollapsed?: boolean;
 }
 
-const MastodonTicker: React.FC<TickerProps> = ({ config }) => {
+const MastodonTicker: React.FC<TickerProps> = ({ config, isCollapsed }) => {
   const [items, setItems] = useState<TickerItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,9 +105,9 @@ const MastodonTicker: React.FC<TickerProps> = ({ config }) => {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 px-3 py-2 bg-slate-200 dark:bg-slate-700 rounded-full text-xs text-slate-500 dark:text-slate-400 h-9 min-w-[40px] leading-none">
-        <MastodonIcon size={12} className="animate-spin" />
-        <span className="hidden md:inline">加载中...</span>
+      <div className="flex items-center justify-center bg-slate-200 dark:bg-slate-700 rounded-full h-9 w-9 md:w-auto md:px-3 text-slate-500 dark:text-slate-400 leading-none">
+        <MastodonIcon size={12} />
+        <span className="hidden md:inline ml-2">加载中...</span>
       </div>
     );
   }
@@ -116,6 +117,18 @@ const MastodonTicker: React.FC<TickerProps> = ({ config }) => {
       <div className="flex items-center gap-2 px-3 py-2 bg-slate-200 dark:bg-slate-700 rounded-full text-xs text-slate-500 dark:text-slate-400 h-9 leading-none">
         <MastodonIcon size={12} />
         <span className="hidden md:inline">{error || '暂无动态'}</span>
+      </div>
+    );
+  }
+
+  if (isCollapsed) {
+    return (
+      <div 
+        className="flex items-center justify-center bg-slate-200 dark:bg-slate-700 rounded-full h-9 w-9 cursor-pointer hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors shrink-0"
+        onClick={() => items[0]?.url && window.open(items[0].url, '_blank')}
+        title={items[0]?.content.replace(/<[^>]*>/g, '') || '查看动态'}
+      >
+        <MastodonIcon size={14} className="text-blue-500" />
       </div>
     );
   }
@@ -137,7 +150,7 @@ const MastodonTicker: React.FC<TickerProps> = ({ config }) => {
                 title={item.content.replace(/<[^>]*>/g, '')}
               >
                 <span 
-                  className="text-xs text-slate-700 dark:text-slate-300 truncate max-w-[400px] lg:max-w-[500px] 2xl:max-w-[600px]"
+                  className="text-xs text-slate-700 dark:text-slate-300 truncate max-w-[200px] sm:max-w-[300px] md:max-w-[400px] lg:max-w-[500px] 2xl:max-w-[600px]"
                   dangerouslySetInnerHTML={{ __html: item.content }}
                 />
               </div>
@@ -150,7 +163,7 @@ const MastodonTicker: React.FC<TickerProps> = ({ config }) => {
               title={items[0]?.content.replace(/<[^>]*>/g, '')}
             >
               <span 
-                className="text-xs text-slate-700 dark:text-slate-300 truncate max-w-[400px] lg:max-w-[500px] 2xl:max-w-[600px]"
+                className="text-xs text-slate-700 dark:text-slate-300 truncate max-w-[200px] sm:max-w-[300px] md:max-w-[400px] lg:max-w-[500px] 2xl:max-w-[600px]"
                 dangerouslySetInnerHTML={{ __html: items[0]?.content || '' }}
               />
             </div>

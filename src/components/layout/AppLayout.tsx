@@ -320,6 +320,8 @@ export function AppLayout() {
           onSearch={handleSearch}
           onAddLink={handleAddLink}
           onOpenSettings={() => setIsSettingsModalOpen(true)}
+          onOpenCatManager={() => setIsCatManagerOpen(true)}
+          onOpenBackup={() => setIsBackupModalOpen(true)}
           onOpenImport={() => setIsImportModalOpen(true)}
           onOpenAuth={() => setIsAuthOpen(true)}
           onToggleSidebar={() => setSidebarOpen(prev => !prev)}
