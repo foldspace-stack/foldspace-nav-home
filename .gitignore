@@ -5,7 +5,7 @@
 ### Custom ###
 
 .edgeone/
-
+start-codex.sh
 .agents/
 
 content/
