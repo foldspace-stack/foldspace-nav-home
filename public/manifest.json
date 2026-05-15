@@ -1,6 +1,6 @@
 {
-  "name": "蜗牛个人导航",
-  "short_name": "蜗牛个人导航",
+  "name": "foldspace 组织导航",
+  "short_name": "foldspace 导航",
   "description": "一个现代化的云端导航页面",
   "start_url": "/",
   "display": "standalone",

@@ -113,7 +113,7 @@ export function AppLayout() {
   // Apply dynamic website title and favicon
   useEffect(() => {
     if (aiConfig) {
-      document.title = aiConfig.websiteTitle || '蜗牛个人导航';
+      document.title = aiConfig.websiteTitle || 'foldspace 组织导航';
       
       let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
       if (!link) {
