@@ -3,11 +3,14 @@ import { Lock, ArrowRight, Loader2, X } from 'lucide-react';
 
 interface AuthModalProps {
   isOpen: boolean;
-  onLogin: (password: string) => Promise<boolean>;
+  onLogin: (username: string, password: string) => Promise<boolean>;
+  onBootstrap: (username: string, password: string) => Promise<boolean>;
+  hasBootstrap: boolean;
   onClose: () => void;
 }
 
-const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onLogin, onClose }) => {
+const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onLogin, onBootstrap, hasBootstrap, onClose }) => {
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -15,13 +18,16 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onLogin, onClose }) => {
   if (!isOpen) return null;
 
   const handleLogin = async () => {
-    if (!password || isLoading) return;
+    if (!username || !password || isLoading) return;
     setIsLoading(true);
     setError('');
 
     try {
-      const success = await onLogin(password);
+      const success = hasBootstrap
+        ? await onBootstrap(username, password)
+        : await onLogin(username, password);
       if (success) {
+        setUsername('');
         setPassword('');
         onClose();
       } else {
@@ -60,11 +66,21 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onLogin, onClose }) => {
             </div>
             <h2 className="text-xl font-bold dark:text-white">身份验证</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 text-center mt-2">
-              请输入部署时设置的 PASSWORD 以同步数据
+              {hasBootstrap ? '先创建第一个管理员账号' : '请输入账号和密码以登录管理后台'}
             </p>
           </div>
 
           <div className="space-y-4">
+            <div>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-center"
+                placeholder="用户名"
+                autoFocus
+              />
+            </div>
             <div>
               <input
                 type="password"
@@ -89,7 +105,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onLogin, onClose }) => {
               disabled={isLoading || !password}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 cursor-pointer"
             >
-              {isLoading ? <Loader2 className="animate-spin" /> : <>解锁进入 <ArrowRight size={18} /></>}
+              {isLoading ? <Loader2 className="animate-spin" /> : <>{hasBootstrap ? '创建并进入' : '登录进入'} <ArrowRight size={18} /></>}
             </button>
           </div>
         </div>
