@@ -333,7 +333,7 @@ export function Header({
 
           {/* GitHub link */}
           <a
-            href="https://github.com/eallion/favorite"
+            href="https://github.com/cloudflare/vinext"
             target="_blank"
             rel="noopener noreferrer"
             className={`${isMobileSearchOpen ? 'hidden' : 'flex'} items-center justify-center p-2 rounded-full text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 h-[36px] min-w-[36px] transition-colors`}

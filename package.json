@@ -20,7 +20,7 @@
     "url": "https://github.com/cloudflare/vinext.git"
   },
   "bugs": {
-    "url": "https://github.com/eallion/favorite/issues"
+    "url": "https://github.com/cloudflare/vinext/issues"
   },
   "engines": {
     "node": ">=18.0.0",
