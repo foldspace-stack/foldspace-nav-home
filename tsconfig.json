@@ -38,12 +38,14 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "emitDecoratorMetadata": true,
+    "types": ["node", "@cloudflare/workers-types"]
   },
   "include": [
     "src",
-    "*.tsx",
-    "*.ts",
+    "App.tsx",
+    "index.tsx",
+    "types.ts",
     "components/**/*",
     "services/**/*"
   ],

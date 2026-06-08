@@ -3,23 +3,21 @@
   "private": true,
   "version": "2.0.1",
   "type": "module",
-  "description": "A modern cloud-based navigation page supporting EdgeOne, Cloudflare, and Vercel",
+  "description": "A modern cloud-based navigation page for Cloudflare Worker and D1",
   "keywords": [
     "navigation",
     "bookmarks",
-    "edgeone",
     "cloudflare",
-    "vercel",
     "react",
     "typescript",
     "vite"
   ],
   "author": "eallion",
   "license": "MIT",
-  "homepage": "https://github.com/eallion/favorite",
+  "homepage": "https://github.com/cloudflare/vinext",
   "repository": {
     "type": "git",
-    "url": "https://github.com/eallion/favorite.git"
+    "url": "https://github.com/cloudflare/vinext.git"
   },
   "bugs": {
     "url": "https://github.com/eallion/favorite/issues"
@@ -30,20 +28,26 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:worker": "wrangler dev",
     "build": "vite build",
+    "deploy": "wrangler deploy",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "lint:fix": "eslint . --ext ts,tsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css,md,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,css,md,json}\"",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "d1:migrate": "wrangler d1 migrations apply foldspace-nav-home",
+    "d1:migrate:local": "wrangler d1 migrations apply foldspace-nav-home --local",
+    "types:worker": "wrangler types"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^8.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@google/genai": "^1.52.0",
-    "@vercel/kv": "^3.0.0",
     "buffer": "^6.0.3",
     "lucide-react": "^0.554.0",
     "react": "^19.2.6",
@@ -53,6 +57,8 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.0",
     "@types/node": "^22.19.18",
+    "@types/react": "^19.2.6",
+    "@types/react-dom": "^19.2.3",
     "@typescript-eslint/eslint-plugin": "^8.59.2",
     "@typescript-eslint/parser": "^8.59.2",
     "@vitejs/plugin-react": "^5.2.0",
@@ -62,6 +68,9 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "prettier": "^3.8.3",
+    "@cloudflare/vitest-pool-workers": "^0.10.4",
+    "@cloudflare/workers-types": "^4.20250408.0",
+    "vitest": "^3.2.4",
     "tailwindcss": "^4.3.0",
     "terser": "^5.47.1",
     "typescript": "~5.8.3",
