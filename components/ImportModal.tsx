@@ -3,6 +3,7 @@ import { X, Upload, FileText, ArrowRight, Check, AlertCircle, FolderInput, ListT
 import { Category, LinkItem, SearchConfig, AIConfig } from '../types';
 import { parseBookmarks } from '../services/bookmarkParser';
 import { toast } from './Toast';
+import { proxyIconUrl } from '../src/utils/iconProxy';
 
 interface ImportModalProps {
   isOpen: boolean;
@@ -141,7 +142,7 @@ const ImportModal: React.FC<ImportModalProps> = ({
       // Fallback to default if no icon is provided
       if (!iconUrl) {
         const domain = new URL(link.url).hostname;
-        iconUrl = `https://www.faviconextractor.com/favicon/${domain}?larger=true`;
+        iconUrl = proxyIconUrl(`https://www.faviconextractor.com/favicon/${domain}?larger=true`);
         detectedIconType = 'faviconextractor';
       } else {
         // Detect icon type from URL pattern
@@ -180,6 +181,8 @@ const ImportModal: React.FC<ImportModalProps> = ({
           };
         }
       }
+
+      iconUrl = proxyIconUrl(iconUrl);
 
       // Generate a complete LinkItem object with detected icon type information
       const linkItem: any = {
@@ -222,7 +225,7 @@ const ImportModal: React.FC<ImportModalProps> = ({
           title: "GitHub",
           url: "https://github.com",
           description: "代码托管平台 - 使用 Google Favicon API",
-          icon: "https://www.google.com/s2/favicons?domain=github.com&sz=64",
+          icon: "/api/proxy?url=" + encodeURIComponent("https://www.google.com/s2/favicons?domain=github.com&sz=64"),
           categoryId: "common",
           pinned: true
         },
@@ -230,7 +233,7 @@ const ImportModal: React.FC<ImportModalProps> = ({
           title: "Favicon Extractor 示例",
           url: "https://react.dev",
           description: "使用 Favicon Extractor 的示例",
-          icon: "https://www.faviconextractor.com/favicon/react.dev?larger=true",
+          icon: "/api/proxy?url=" + encodeURIComponent("https://www.faviconextractor.com/favicon/react.dev?larger=true"),
           categoryId: "dev",
           pinned: false
         },

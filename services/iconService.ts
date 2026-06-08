@@ -1,4 +1,5 @@
 import { IconConfig, IconSourceType } from '../types';
+import { proxyIconUrl } from '../src/utils/iconProxy';
 
 export class IconService {
   private config: IconConfig;
@@ -32,13 +33,13 @@ export class IconService {
   // 1. FaviconExtractor API
   private async getFaviconExtractorIcon(url: string): Promise<string> {
     const domain = new URL(url).hostname;
-    return `https://www.faviconextractor.com/favicon/${domain}?larger=true`;
+    return proxyIconUrl(`https://www.faviconextractor.com/favicon/${domain}?larger=true`);
   }
 
   // 2. Google Favicon API
   private async getGoogleIcon(url: string): Promise<string> {
     const domain = new URL(url).hostname;
-    return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+    return proxyIconUrl(`https://www.google.com/s2/favicons?domain=${domain}&sz=64`);
   }
 
   // 3. 自定义API
@@ -72,7 +73,7 @@ export class IconService {
     }
 
     const domain = new URL(url).hostname;
-    return this.config.customurl.url.replace('{domain}', domain).replace('{url}', encodeURIComponent(url));
+    return proxyIconUrl(this.config.customurl.url.replace('{domain}', domain).replace('{url}', encodeURIComponent(url)));
   }
 
   
