@@ -1,0 +1,19 @@
+{
+  "name": "foldspace-nav-home",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-06-08",
+  "assets": {
+    "binding": "ASSETS",
+    "directory": "./dist"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "foldspace-nav-home",
+      "database_id": "00000000-0000-0000-0000-000000000000"
+    }
+  ],
+  "vars": {
+    "APP_NAME": "foldspace 组织导航"
+  }
+}
