@@ -3,6 +3,7 @@ import { X, Cloud, Download, Upload, CheckCircle2, AlertCircle, RefreshCw, Save,
 import { Category, LinkItem, WebDavConfig, SearchConfig, AIConfig } from '../types';
 import { checkWebDavConnection, uploadBackup, downloadBackup } from '../services/webDavService';
 import { generateBookmarkHtml, downloadHtmlFile } from '../services/exportService';
+import { API_ENDPOINTS } from '../src/constants';
 
 interface BackupModalProps {
   isOpen: boolean;
@@ -104,10 +105,10 @@ const BackupModal: React.FC<BackupModalProps> = ({
     // 也获取 config key 以备份所有设置
     let appConfig = null;
     try {
-      const res = await fetch('/api/storage?key=config');
+      const res = await fetch(`${API_ENDPOINTS.SETTINGS}/config`, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
-        if (data.value) appConfig = JSON.parse(data.value);
+        if (data.value) appConfig = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
       }
     } catch (e) { /* ignore */ }
 

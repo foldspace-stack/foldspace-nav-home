@@ -67,22 +67,32 @@ export function LinksProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // 同步到云端
-  const syncToCloud = useCallback(async (links: LinkItem[], categories: Category[], token: string) => {
+  const syncToCloud = useCallback(async (links: LinkItem[], categories: Category[]) => {
     dispatch({ type: 'SET_SYNC_STATUS', payload: 'saving' });
     try {
-      const res = await fetch(API_ENDPOINTS.STORAGE, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-auth-password': token,
-        },
-        body: JSON.stringify({ links, categories }),
-      });
-      if (res.status === 401) {
+      const [sitesRes, categoriesRes] = await Promise.all([
+        fetch(API_ENDPOINTS.SITES, {
+          method: 'PUT',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ links }),
+        }),
+        fetch(API_ENDPOINTS.CATEGORIES, {
+          method: 'PUT',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ categories }),
+        }),
+      ]);
+      if (sitesRes.status === 401 || categoriesRes.status === 401) {
         dispatch({ type: 'SET_SYNC_STATUS', payload: 'error' });
         return false;
       }
-      if (!res.ok) throw new Error('Sync failed');
+      if (!sitesRes.ok || !categoriesRes.ok) throw new Error('Sync failed');
       dispatch({ type: 'SET_SYNC_STATUS', payload: 'saved' });
       setTimeout(() => dispatch({ type: 'SET_SYNC_STATUS', payload: 'idle' }), 2000);
       return true;
@@ -97,7 +107,7 @@ export function LinksProvider({ children }: { children: React.ReactNode }) {
   const persist = useCallback((links: LinkItem[], categories: Category[]) => {
     localStorage.setItem(STORAGE_KEYS.LOCAL_STORAGE_KEY, JSON.stringify({ links, categories }));
     if (authToken) {
-      syncToCloud(links, categories, authToken);
+      syncToCloud(links, categories);
     }
   }, [authToken, syncToCloud]);
 

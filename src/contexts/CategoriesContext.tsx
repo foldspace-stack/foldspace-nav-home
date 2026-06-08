@@ -115,14 +115,20 @@ export function CategoriesProvider({ children }: { children: React.ReactNode }) 
   const persist = useCallback((categories: Category[], links: LinkItem[]) => {
     localStorage.setItem(STORAGE_KEYS.LOCAL_STORAGE_KEY, JSON.stringify({ links, categories }));
     if (authToken) {
-      fetch(API_ENDPOINTS.STORAGE, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-auth-password': authToken,
-        },
-        body: JSON.stringify({ links, categories }),
-      }).catch(e => console.error('Sync categories failed:', e));
+      Promise.all([
+        fetch(API_ENDPOINTS.SITES, {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ links }),
+        }),
+        fetch(API_ENDPOINTS.CATEGORIES, {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ categories }),
+        }),
+      ]).catch(e => console.error('Sync categories failed:', e));
     }
   }, [authToken]);
 

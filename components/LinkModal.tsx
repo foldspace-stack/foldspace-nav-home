@@ -3,6 +3,8 @@ import { X, Sparkles, Loader2, Pin, Wand2, Trash2 } from 'lucide-react';
 import { LinkItem, Category, AIConfig, IconSourceType, IconConfig } from '../types';
 import { generateLinkDescription, suggestCategory } from '../services/geminiService';
 import { toast } from './Toast';
+import { API_ENDPOINTS } from '../src/constants';
+import { proxyIconUrl } from '../src/utils/iconProxy';
 
 interface LinkModalProps {
   isOpen: boolean;
@@ -127,33 +129,22 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
     onClose();
   };
 
-  // 缓存自定义图标到KV空间
+  // 缓存自定义图标到服务器设置表
   const cacheCustomIcon = async (url: string, iconUrl: string) => {
     try {
-      // 提取域名
       let domain = url;
       if (domain.startsWith('http://') || domain.startsWith('https://')) {
         const urlObj = new URL(domain);
         domain = urlObj.hostname;
       }
-      
-      // 将自定义图标保存到KV缓存
-      const authToken = localStorage.getItem('authToken');
-      if (authToken) {
-        await fetch('/api/storage', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-auth-password': authToken
-          },
-          body: JSON.stringify({
-            saveConfig: 'favicon',
-            domain: domain,
-            icon: iconUrl
-          })
-        });
-        console.log(`Custom icon cached for domain: ${domain}`);
-      }
+      const proxiedIconUrl = proxyIconUrl(iconUrl);
+      await fetch(`${API_ENDPOINTS.SETTINGS}/favicon:${domain}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: proxiedIconUrl }),
+      });
+      console.log(`Custom icon cached for domain: ${domain}`);
     } catch (error) {
       console.log("Failed to cache custom icon", error);
     }
@@ -183,7 +174,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
       pinnedOrder
     });
     
-    // 如果有自定义图标URL，缓存到KV空间
+    // 如果有自定义图标 URL，缓存到服务器设置
     if (icon && !icon.includes('faviconextractor.com')) {
       cacheCustomIcon(finalUrl, icon);
     }
@@ -272,23 +263,16 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
           iconUrl = `https://www.faviconextractor.com/favicon/${domain}?larger=true`;
       }
 
-      setIcon(iconUrl);
+      setIcon(proxyIconUrl(iconUrl));
 
-      // 将图标保存到KV缓存（仅对faviconextractor和google）
+      // 将图标保存到服务器设置表（仅对faviconextractor和google）
       try {
-        const authToken = localStorage.getItem('authToken');
-        if (authToken && (iconType === 'faviconextractor' || iconType === 'google')) {
-          await fetch('/api/storage', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-auth-password': authToken
-            },
-            body: JSON.stringify({
-              saveConfig: 'favicon',
-              domain: domain,
-              icon: iconUrl
-            })
+        if (iconType === 'faviconextractor' || iconType === 'google') {
+          await fetch(`${API_ENDPOINTS.SETTINGS}/favicon:${domain}`, {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value: proxyIconUrl(iconUrl) }),
           });
         }
       } catch (error) {

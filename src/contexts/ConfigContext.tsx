@@ -45,8 +45,8 @@ interface ConfigContextValue extends ConfigState {
   setViewMode: (mode: 'compact' | 'detailed') => void;
   setShowPinned: (show: boolean) => void;
   setDarkMode: (dark: boolean) => void;
-  syncConfigToKV: (authToken: string) => Promise<boolean>;
-  loadConfigFromKV: (authToken: string) => Promise<void>;
+  syncConfigToServer: () => Promise<boolean>;
+  loadConfigFromServer: () => Promise<void>;
 }
 
 // --- Defaults ---
@@ -197,12 +197,12 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const syncConfigToKV = useCallback(async (authToken: string) => {
-    return configManager.syncToKV(authToken);
+  const syncConfigToServer = useCallback(async () => {
+    return configManager.syncToServer();
   }, []);
 
-  const loadConfigFromKV = useCallback(async (authToken: string) => {
-    await configManager.syncFromKV(authToken);
+  const loadConfigFromServer = useCallback(async () => {
+    await configManager.syncFromServer();
     const config = configManager.getConfig();
     dispatch({ type: 'LOAD_CONFIG', payload: {
       ai: config.ai || defaultAI,
@@ -212,13 +212,16 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
       icon: config.icon || DEFAULT_ICON_CONFIG,
       ticker: config.ticker || config.mastodon || defaultTicker,
       weather: config.weather || defaultWeather,
+      viewMode: config.view?.defaultMode || config.view?.mode || 'detailed',
+      showPinnedWebsites: config.ui?.showPinnedWebsites ?? true,
+      darkMode: config.ui?.darkMode ?? false,
     }});
   }, []);
 
   const initConfig = useCallback((config: Partial<ConfigState>) => {
-    // 只合并非空配置，避免空对象覆盖默认值
+    // 只合并已定义配置，避免空对象覆盖默认值
     const filtered = Object.fromEntries(
-      Object.entries(config).filter(([_, v]) => v && typeof v === 'object' && Object.keys(v).length > 0)
+      Object.entries(config).filter(([_, v]) => v !== undefined && v !== null)
     );
     if (Object.keys(filtered).length > 0) {
       dispatch({ type: 'LOAD_CONFIG', payload: filtered });
@@ -231,7 +234,7 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
       initConfig,
       setAI, setWebsite, setWebDav, setSearch, setIcon,
       setMastodon, setWeather, setViewMode, setShowPinned, setDarkMode,
-      syncConfigToKV, loadConfigFromKV,
+      syncConfigToServer, loadConfigFromServer,
     }}>
       {children}
     </ConfigContext.Provider>

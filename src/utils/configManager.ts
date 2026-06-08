@@ -1,5 +1,5 @@
-import { AppConfig, WebDavConfig, SearchConfig, IconConfig, AIConfig, WebsiteConfig, TickerConfig, WeatherConfig } from '../types';
-import { STORAGE_KEYS } from '../constants';
+import { AppConfig, WebDavConfig, SearchConfig, IconConfig, AIConfig, WebsiteConfig, TickerConfig, WeatherConfig } from '../../types';
+import { STORAGE_KEYS, API_ENDPOINTS } from '../constants';
 
 // 默认配置
 const DEFAULT_APP_CONFIG: AppConfig = {
@@ -228,56 +228,52 @@ class ConfigManager {
   }
 
   /**
-   * 同步配置到 KV 存储
+   * 同步配置到服务器
    */
-  async syncToKV(authToken: string): Promise<boolean> {
+  async syncToServer(): Promise<boolean> {
     try {
-      const response = await fetch('/api/storage', {
-        method: 'POST',
+      const response = await fetch(`${API_ENDPOINTS.SETTINGS}/config`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'x-auth-password': authToken,
         },
-        body: JSON.stringify({
-          key: STORAGE_KEYS.CONFIG_KEY,
-          value: JSON.stringify(this.config),
-        }),
+        credentials: 'include',
+        body: JSON.stringify({ value: this.config }),
       });
 
       if (response.ok) {
         return true;
       } else {
-        console.error('同步配置到 KV 失败:', response.statusText);
+        console.error('同步配置到服务器失败:', response.statusText);
         return false;
       }
     } catch (error) {
-      console.error('同步配置到 KV 出错:', error);
+      console.error('同步配置到服务器出错:', error);
       return false;
     }
   }
 
   /**
-   * 从 KV 存储同步配置
+   * 从服务器同步配置
    */
-  async syncFromKV(authToken: string): Promise<boolean> {
+  async syncFromServer(): Promise<boolean> {
     try {
-      const response = await fetch(`/api/storage?key=${STORAGE_KEYS.CONFIG_KEY}`, {
-        headers: {
-          'x-auth-password': authToken,
-        },
+      const response = await fetch(`${API_ENDPOINTS.SETTINGS}/config`, {
+        credentials: 'include',
       });
 
       if (response.ok) {
         const data = await response.json();
         if (data.value) {
-          this.config = { ...DEFAULT_APP_CONFIG, ...JSON.parse(data.value) };
+          const savedConfig = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+          this.config = { ...DEFAULT_APP_CONFIG, ...savedConfig };
           this.saveToLocalStorage();
           return true;
         }
       }
       return false;
     } catch (error) {
-      console.error('从 KV 同步配置出错:', error);
+      console.error('从服务器同步配置出错:', error);
       return false;
     }
   }
@@ -308,5 +304,5 @@ export const updateViewMode = (mode: 'compact' | 'detailed', isDefault?: boolean
 export const getViewMode = () => configManager.getViewMode();
 export const updateUIConfig = (config: Partial<AppConfig['ui']>) => configManager.updateUIConfig(config);
 export const getUIConfig = () => configManager.getUIConfig();
-export const syncConfigToKV = (authToken: string) => configManager.syncToKV(authToken);
-export const syncConfigFromKV = (authToken: string) => configManager.syncFromKV(authToken);
+export const syncConfigToServer = () => configManager.syncToServer();
+export const syncConfigFromServer = () => configManager.syncFromServer();

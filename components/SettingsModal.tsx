@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Save, Settings, Clock, LayoutGrid, MessageCircle, Cloud, BookOpen, Upload, CloudCog, LogOut, Loader2, Plus, Trash2, Search } from 'lucide-react';
 import { AIConfig, PasswordExpiryConfig, TickerConfig, WeatherConfig, WeatherProvider, TickerSource, SearchConfig } from '../types';
 import { toast } from './Toast';
-import { SEARCH_ENGINES } from '../src/constants';
+import { API_ENDPOINTS, SEARCH_ENGINES } from '../src/constants';
 
 interface SettingsData {
   ai: AIConfig;
@@ -47,13 +47,14 @@ interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   authToken: string | null;
+  onLogout: () => void;
   onSettingsLoaded: (settings: SettingsData) => void;
   onImportClick: () => void;
   onBackupClick: () => void;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
-  isOpen, onClose, authToken, onSettingsLoaded, onImportClick, onBackupClick
+  isOpen, onClose, authToken, onLogout, onSettingsLoaded, onImportClick, onBackupClick
 }) => {
   const [settings, setSettings] = useState<SettingsData>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(false);
@@ -65,13 +66,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     const fetchSettings = async () => {
       setLoading(true);
       try {
-        // 1. Try to fetch new config key
-        let res = await fetch('/api/storage?key=config');
+        let res = await fetch(`${API_ENDPOINTS.SETTINGS}/config`, { credentials: 'include' });
         let data = res.ok ? await res.json() : null;
 
         if (data?.value) {
           // Mapping AppConfig to SettingsData structure
-          const appConfig = JSON.parse(data.value);
+          const appConfig = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
           
           // Ensure providers map exists
           const aiConfig = appConfig.ai || DEFAULT_SETTINGS.ai;
@@ -123,15 +123,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       }
 
       const finalSettings = { ...settings, ticker: tickerConfig };
-      
-      // Fetch existing config to avoid overwriting other sections like search, webdav, etc.
-      const currentConfigRes = await fetch('/api/storage?key=config');
+
+      const currentConfigRes = await fetch(`${API_ENDPOINTS.SETTINGS}/config`, { credentials: 'include' });
       let currentConfig: any = {};
       if (currentConfigRes.ok) {
         const data = await currentConfigRes.json();
-        if (data.value) currentConfig = JSON.parse(data.value);
+        if (data.value) currentConfig = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
       }
-      
+
       const newConfig = {
         ...currentConfig,
         ai: finalSettings.ai,
@@ -144,10 +143,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         search: finalSettings.search,
       };
 
-      const res = await fetch('/api/storage', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-auth-password': authToken },
-        body: JSON.stringify({ key: 'config', value: JSON.stringify(newConfig) }),
+      const res = await fetch(`${API_ENDPOINTS.SETTINGS}/config`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: newConfig }),
       });
 
       if (res.ok) {
@@ -200,9 +200,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('cloudnav_auth_token');
-    localStorage.removeItem('lastLoginTime');
-    window.dispatchEvent(new CustomEvent('authStateChanged', { detail: { isAuthenticated: false } }));
+    onLogout();
     onClose();
     toast.success('已成功退出登录');
   };

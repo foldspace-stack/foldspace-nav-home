@@ -6,7 +6,7 @@ import { useCategoriesContext } from '../contexts/CategoriesContext';
 import { useConfigContext } from '../contexts/ConfigContext';
 
 /**
- * 数据同步 Hook：管理 localStorage ↔ KV 的加载和同步
+ * 数据同步 Hook：管理 localStorage ↔ 云端 D1 的加载和同步
  */
 export function useDataSync() {
   const { links = [], initLinks, setLinksAndSync } = useLinksContext();
@@ -47,14 +47,17 @@ export function useDataSync() {
     return { links: INITIAL_LINKS, categories: DEFAULT_CATEGORIES };
   }, []);
 
-  // 从 KV 加载链接和分类
-  const loadFromCloud = useCallback(async (): Promise<{ links: LinkItem[]; categories: Category[] } | null> => {
+  // 从云端加载链接、分类和配置
+  const loadFromCloud = useCallback(async (): Promise<{ links: LinkItem[]; categories: Category[]; config: Partial<Record<string, unknown>> } | null> => {
     try {
-      const res = await fetch(`${API_ENDPOINTS.STORAGE}?getConfig=true&readOnly=true`);
+      const res = await fetch(API_ENDPOINTS.BOOTSTRAP);
       if (!res.ok) return null;
       const data = await res.json();
-      if (data.links?.length > 0 || data.categories?.length > 0) {
-        return { links: data.links || [], categories: data.categories || [] };
+      const linksFromServer = Array.isArray(data.links) ? data.links : [];
+      const categoriesFromServer = Array.isArray(data.categories) ? data.categories : [];
+      const configFromServer = data.config && typeof data.config === 'object' ? data.config : {};
+      if (linksFromServer.length > 0 || categoriesFromServer.length > 0 || Object.keys(configFromServer).length > 0) {
+        return { links: linksFromServer, categories: categoriesFromServer, config: configFromServer };
       }
       return null;
     } catch (e) {
@@ -62,33 +65,6 @@ export function useDataSync() {
       return null;
     }
   }, []);
-
-  // 从 KV 加载各个配置
-  const loadConfigsFromCloud = useCallback(async () => {
-    const configKeys = ['search', 'website', 'ai', 'weather', 'mastodon', 'icon'];
-    const configMap: Record<string, any> = {};
-
-    await Promise.all(configKeys.map(async (key) => {
-      try {
-        const res = await fetch(`${API_ENDPOINTS.STORAGE}?getConfig=${key}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data && Object.keys(data).length > 0) {
-            // 将后端命名的 'mastodon' 映射为前端统一使用的 'ticker'
-            const configKey = key === 'mastodon' ? 'ticker' : key;
-            configMap[configKey] = data;
-          }
-        }
-      } catch (e) {
-        console.error(`Load config ${key} failed:`, e);
-      }
-    }));
-
-    // 更新 ConfigContext
-    if (Object.keys(configMap).length > 0) {
-      initConfig(configMap);
-    }
-  }, [initConfig]);
 
   // 初始化数据
   const initData = useCallback(async () => {
@@ -100,27 +76,41 @@ export function useDataSync() {
     initLinks(local.links);
     initCategories(local.categories);
 
-    // 2. 并行从云端获取最新数据
-    const [cloud] = await Promise.all([
-      loadFromCloud(),
-      loadConfigsFromCloud(),
-    ]);
+    // 2. 从云端获取最新数据
+    const cloud = await loadFromCloud();
 
     if (cloud) {
-      // 云端有数据，用云端数据覆盖
-      let cats = cloud.categories || [];
-      if (cats.length > 0 && !cats.some((c: Category) => c.id === 'common')) {
-        cats = [{ id: 'common', name: '常用推荐', icon: 'Star' }, ...cats];
+      // 配置始终可以覆盖本地，但链接和分类仅在云端有内容时覆盖
+      const appConfig = (cloud.config as Record<string, any>).config || cloud.config;
+      if (appConfig && typeof appConfig === 'object') {
+        initConfig({
+          ai: appConfig.ai,
+          website: appConfig.website,
+          webdav: appConfig.webdav,
+          search: appConfig.search,
+          icon: appConfig.icon,
+          ticker: appConfig.ticker || appConfig.mastodon,
+          weather: appConfig.weather,
+          viewMode: appConfig.view?.defaultMode,
+          showPinnedWebsites: appConfig.ui?.showPinnedWebsites,
+          darkMode: appConfig.ui?.darkMode,
+        });
       }
-      initLinks(cloud.links || []);
-      initCategories(cats);
-      // 更新 localStorage 缓存
-      localStorage.setItem(STORAGE_KEYS.LOCAL_STORAGE_KEY, JSON.stringify({
-        links: cloud.links || [],
-        categories: cats,
-      }));
+
+      if (cloud.links?.length || cloud.categories?.length) {
+        let cats = cloud.categories || [];
+        if (cats.length > 0 && !cats.some((c: Category) => c.id === 'common')) {
+          cats = [{ id: 'common', name: '常用推荐', icon: 'Star' }, ...cats];
+        }
+        initLinks(cloud.links || []);
+        initCategories(cats);
+        localStorage.setItem(STORAGE_KEYS.LOCAL_STORAGE_KEY, JSON.stringify({
+          links: cloud.links || [],
+          categories: cats,
+        }));
+      }
     }
-  }, [loadFromLocal, loadFromCloud, loadConfigsFromCloud, initLinks, initCategories]);
+  }, [loadFromLocal, loadFromCloud, initLinks, initCategories, initConfig]);
 
   // 同步到云端
   const syncToCloud = useCallback(async () => {
