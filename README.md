@@ -12,10 +12,10 @@
 - **全分类锚点页面**：所有分类同屏展示，侧边栏一键跳转
 - **前端可视化编辑**：右键菜单 / 拖拽排序 / 批量操作 / 分类管理
 - **访客模式**：普通用户可正常浏览，登录后获得管理权限
-- **KV 按分类存储**：链接按 `links:{category_id}` 拆分存储，读取时自动聚合
-- **多平台部署**：EdgeOne Pages / Cloudflare Pages / Vercel 一键部署
-- **KV 云端存储**：数据持久化，localStorage 缓存 + KV 双向同步
-- **安全管理**：安全随机 Token 鉴权，登录时自动清理旧 Token，支持密码过期时间配置
+- **D1 数据存储**：网站、分类、用户、会话、配置统一进入 Cloudflare D1
+- **Cloudflare 部署**：Worker + D1 + 静态资源一体化部署
+- **本地缓存**：localStorage 仅保留页面缓存和偏好设置
+- **安全管理**：Cookie 会话鉴权，支持管理员初始化、登录和简单用户管理
 - **AI 辅助**：集成 Gemini / OpenAI 兼容 API，自动填充链接描述、智能分类建议
 - **数据导入导出**：Chrome 书签 HTML / JSON 备份 / WebDAV 云同步
 - **丰富小组件**：Mastodon / Memos 动态滚动条、实时天气（和风天气）
@@ -43,9 +43,8 @@
 
 #### Serverless / Storage
 
-- **EdgeOne Pages**: Edge Functions + EdgeOne KV
-- **Cloudflare Pages**: Pages Functions + Cloudflare KV
-- **Vercel**: Vercel Functions + Vercel KV (Upstash Redis)
+- **Cloudflare Worker**: API 路由 + 静态资源托管
+- **Cloudflare D1**: 统一存储网站、分类、用户、会话和设置
 
 ```
 ┌──────────────────────────────────────────────┐
@@ -56,65 +55,33 @@
 │  DnD: @dnd-kit                               │
 │  Icons: lucide-react                         │
 │                                              │
-│  Data: localStorage (cache) + KV (persist)   │
+│  Data: localStorage (cache) + D1 (persist)    │
 └──────────────────┬───────────────────────────┘
                    │ HTTP API
 ┌──────────────────┴───────────────────────────┐
-│     EdgeOne / Cloudflare / Vercel Backend    │
+│          Cloudflare Worker Backend           │
 │                                              │
-│  KV 存储：links:{category_id} 按分类拆分     │
-│  认证：安全随机 Token + 自动清理旧 Token     │
-│  平台适配：多平台 KV 接口抽象（屏蔽底层差异）│
+│  D1 存储：网站 / 分类 / 用户 / 配置 / 会话  │
+│  认证：HttpOnly Cookie 会话                  │
+│  统一 API：/api/bootstrap /api/sites 等      │
 └──────────────────────────────────────────────┘
 ```
 
 ## 🚀 部署指南
 
-### EdgeOne Pages (推荐)
+### Cloudflare Worker + D1
 
-1. Fork 或克隆本仓库。
-2. 在 EdgeOne 控制台创建 Pages 项目。
-3. 构建设置：
-   - 框架预设：`Vite`
-   - 输出目录：`./dist`
-   - 安装命令：`pnpm install`
-   - 编译命令：`pnpm build`
-4. 绑定 KV：创建 KV 命名空间，变量名称设为 `CLOUDNAV_KV`。
-5. 环境变量：设置 `PASSWORD`（管理密码）。
-
-### Cloudflare Pages
-
-1. 在 Cloudflare 控制台创建 Pages 项目，连接 GitHub 仓库。
-2. 构建设置：
-   - 框架预设选择 `Other`
-   - 安装命令 `pnpm install`
-   - 输出目录 `dist`。
-3. 创建并绑定 KV：
-   - 导航至 **Workers & Pages** -> **KV** -> **Create a namespace**。
-   - 名字设为 `CLOUDNAV_KV`。
-   - 回到 Pages 项目设置 -> **Settings** -> **Functions** -> **KV namespace bindings**。
-   - 添加绑定：变量名称设为 `CLOUDNAV_KV`，选择刚才创建的命名空间。
-4. 环境变量：
-   - 在项目设置 -> **Environment variables** 中添加 `PASSWORD`（管理密码）。
-5. 重新部署。
-
-### Vercel
-
-1. 在 Vercel 控制台导入 GitHub 仓库，框架预设选择 `Vite`。
-2. 创建并连接 KV：
-   - 在项目顶部菜单点击 **Storage** -> **Create Database** -> **Upstash for Redis**。
-   - 创建成功后，点击 **Connect** 按钮将其绑定到本项目。
-   - Vercel 会自动注入 `KV_URL` 等环境变量。
-3. 环境变量：
-   - 在项目 **Settings** -> **Environment Variables** 中手动添加 `PASSWORD`。
-4. 重新部署。
+1. 在 Cloudflare 控制台创建 Worker 和 D1 数据库。
+2. 执行 `pnpm build` 构建前端资源。
+3. 配置 `wrangler.jsonc` 中的 `d1_databases` 和静态资源绑定。
+4. 执行 `pnpm deploy` 或 `wrangler deploy` 部署到 Cloudflare Worker。
+5. 首次登录后在后台完成管理员 bootstrap，然后再添加站点和普通用户。
 
 ## ⚙️ 环境变量
 
 | 变量 | 说明 | 必填 | 默认值 |
 |------|------|------|--------|
-| `PASSWORD` | 管理后台登录密码 | 是 | - |
-| `ALLOWED_ORIGIN` | CORS 允许的域名 | 否 | `*` |
+| `CLOUDFLARE_API_TOKEN` | 创建 D1 / 远程部署时使用 | 部分场景 | - |
 
 ## 🛠️ 本地开发
 
@@ -125,30 +92,20 @@ pnpm install
 # 1. 启动 Vite 开发服务器 (localhost:3000，仅前端)
 pnpm dev
 
-# 2. 模拟 EdgeOne 环境 (需安装 edgeone cli)
-edgeone pages link
-edgeone pages dev
-
-# 3. 模拟 Cloudflare 环境 (需安装 wrangler)
+# 2. 本地模拟 Cloudflare Worker + D1
 pnpm build
-wrangler pages dev ./dist --kv CLOUDNAV_KV
-
-# 4. 模拟 Vercel 环境 (需安装 vercel cli)
-# 需要先运行 vercel env pull .env.local 拉取云端 KV 变量
-vercel dev
+pnpm dev:worker
 ```
 
 ### 数据存储说明
 
-- **KV Key 结构**：链接按分类拆分存储，key 格式为 `links:{category_id}`。
-- **本地模拟**：EdgeOne 使用 CLI 模拟 KV；Vercel 需连接云端测试 KV 或使用 `kvMock.ts`。
+- **D1 表结构**：网站、分类、用户、会话和设置统一存储在数据库中。
+- **本地缓存**：`localStorage` 仅用于提升首次渲染速度和保留用户偏好。
 - **首次部署**：系统会使用 `types.ts` 中的 `INITIAL_LINKS` 作为初始演示数据。
 
 ## 📁 项目结构
 
 ```
-├── api/                       # Vercel Serverless Functions (TypeScript)
-├── functions/api/             # EdgeOne / Cloudflare Pages Functions (JavaScript)
 ├── components/                # 通用 UI 组件 (Modal, Toast, ErrorBoundary, 小组件等)
 ├── services/                  # 前端业务逻辑 (AI, 书签解析, 导出, WebDAV 等)
 ├── src/
@@ -160,8 +117,7 @@ vercel dev
 ├── public/                    # 静态资源
 ├── App.tsx                    # 应用入口
 ├── types.ts                   # 类型定义 & 初始数据
-├── vercel.json                # Vercel 部署配置
-├── edgeone.json               # EdgeOne Pages 配置
+├── wrangler.jsonc             # Cloudflare Worker / D1 配置
 └── package.json               # 项目依赖
 ```
 
