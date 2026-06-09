@@ -1,5 +1,5 @@
 {
-  "name": "cloudnav",
+  "name": "foldspace-nav",
   "private": true,
   "version": "2.0.1",
   "type": "module",
@@ -12,7 +12,7 @@
     "typescript",
     "vite"
   ],
-  "author": "eallion",
+  "author": "timger",
   "license": "MIT",
   "homepage": "https://github.com/cloudflare/vinext",
   "repository": {
@@ -27,21 +27,9 @@
     "pnpm": ">=8.0.0"
   },
   "scripts": {
-    "dev": "vite",
-    "dev:worker": "wrangler dev",
+    "dev": "node scripts/dev.mjs",
     "build": "vite build",
-    "deploy": "wrangler deploy",
-    "preview": "vite preview",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "lint:fix": "eslint . --ext ts,tsx --fix",
-    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css,md,json}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,css,md,json}\"",
-    "type-check": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "d1:migrate": "wrangler d1 migrations apply foldspace-nav-home",
-    "d1:migrate:local": "wrangler d1 migrations apply foldspace-nav-home --local",
-    "types:worker": "wrangler types"
+    "deploy": "wrangler deploy"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -55,6 +43,8 @@
     "uuid": "^13.0.2"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.10.4",
+    "@cloudflare/workers-types": "^4.20250408.0",
     "@tailwindcss/postcss": "^4.3.0",
     "@types/node": "^22.19.18",
     "@types/react": "^19.2.6",
@@ -68,13 +58,11 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "prettier": "^3.8.3",
-    "@cloudflare/vitest-pool-workers": "^0.10.4",
-    "@cloudflare/workers-types": "^4.20250408.0",
-    "vitest": "^3.2.4",
     "tailwindcss": "^4.3.0",
     "terser": "^5.47.1",
     "typescript": "~5.8.3",
     "vite": "^6.4.2",
-    "wrangler": "^3.90.0"
+    "vitest": "^3.2.4",
+    "wrangler": "^4.98.0"
   }
 }
