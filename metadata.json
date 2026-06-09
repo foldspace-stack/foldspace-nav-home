@@ -1,5 +1,5 @@
 {
   "name": "foldspace 组织导航",
-  "description": "A modern, private navigation dashboard with Chrome bookmark import support and AI-powered organization.",
+  "description": "A modern navigation dashboard built on Cloudflare Worker and D1, with bookmark import and admin management.",
   "requestFramePermissions": []
 }

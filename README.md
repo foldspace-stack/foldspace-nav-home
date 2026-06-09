@@ -14,7 +14,7 @@
 - **访客模式**：普通用户可正常浏览，登录后获得管理权限
 - **D1 数据存储**：网站、分类、用户、会话、配置统一进入 Cloudflare D1
 - **Cloudflare 部署**：Worker + D1 + 静态资源一体化部署
-- **本地缓存**：localStorage 仅保留页面缓存和偏好设置
+- **本地缓存**：localStorage 仅保留页面缓存和偏好设置，不再作为主数据源
 - **安全管理**：Cookie 会话鉴权，支持管理员初始化、登录和简单用户管理
 - **AI 辅助**：集成 Gemini / OpenAI 兼容 API，自动填充链接描述、智能分类建议
 - **数据导入导出**：Chrome 书签 HTML / JSON 备份 / WebDAV 云同步
@@ -89,19 +89,17 @@
 # 安装依赖
 pnpm install
 
-# 1. 启动 Vite 开发服务器 (localhost:3000，仅前端)
+# 1. 启动一体化本地开发环境（Worker + D1 + 静态资源）
 pnpm dev
-
-# 2. 本地模拟 Cloudflare Worker + D1
-pnpm build
-pnpm dev:worker
 ```
+
+`pnpm dev` 会先构建静态资源，再通过 `wrangler dev` 在 `http://127.0.0.1:56435/` 提供页面和 `/api/*`。
 
 ### 数据存储说明
 
 - **D1 表结构**：网站、分类、用户、会话和设置统一存储在数据库中。
 - **本地缓存**：`localStorage` 仅用于提升首次渲染速度和保留用户偏好。
-- **首次部署**：系统会使用 `types.ts` 中的 `INITIAL_LINKS` 作为初始演示数据。
+- **首次部署**：系统会通过 D1 和后台 bootstrap 进入空白初始状态，由管理员自行添加网站和分类。
 
 ## 📁 项目结构
 
