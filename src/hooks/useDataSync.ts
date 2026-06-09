@@ -1,9 +1,10 @@
 import { useCallback, useRef } from 'react';
-import { LinkItem, Category, DEFAULT_CATEGORIES, INITIAL_LINKS } from '../../types';
+import { LinkItem, Category, DEFAULT_CATEGORIES } from '../../types';
 import { STORAGE_KEYS, API_ENDPOINTS } from '../constants';
 import { useLinksContext } from '../contexts/LinksContext';
 import { useCategoriesContext } from '../contexts/CategoriesContext';
 import { useConfigContext } from '../contexts/ConfigContext';
+import { readJsonResponse } from '../utils/http';
 
 /**
  * 数据同步 Hook：管理 localStorage ↔ 云端 D1 的加载和同步
@@ -35,7 +36,7 @@ export function useDataSync() {
 
         // 修复无效 categoryId
         const validIds = new Set(cats.map((c: Category) => c.id));
-        let lnks: LinkItem[] = (parsed.links || INITIAL_LINKS).map((l: LinkItem) =>
+        let lnks: LinkItem[] = (parsed.links || []).map((l: LinkItem) =>
           validIds.has(l.categoryId) ? l : { ...l, categoryId: 'common' }
         );
 
@@ -44,7 +45,7 @@ export function useDataSync() {
     } catch (e) {
       console.error('Load from local failed:', e);
     }
-    return { links: INITIAL_LINKS, categories: DEFAULT_CATEGORIES };
+    return { links: [], categories: DEFAULT_CATEGORIES };
   }, []);
 
   // 从云端加载链接、分类和配置
@@ -52,7 +53,8 @@ export function useDataSync() {
     try {
       const res = await fetch(API_ENDPOINTS.BOOTSTRAP);
       if (!res.ok) return null;
-      const data = await res.json();
+      const data = await readJsonResponse<Record<string, unknown>>(res);
+      if (!data) return null;
       const linksFromServer = Array.isArray(data.links) ? data.links : [];
       const categoriesFromServer = Array.isArray(data.categories) ? data.categories : [];
       const configFromServer = data.config && typeof data.config === 'object' ? data.config : {};

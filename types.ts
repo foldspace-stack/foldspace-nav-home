@@ -1,5 +1,3 @@
-import { proxyIconUrl } from './src/utils/iconProxy';
-
 export interface LinkItem {
   id: string;
   title: string;
@@ -231,13 +229,4 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: "tools","name":"工具","icon":"Folder","isSubcategory":false},
   { id: "life","name":"生活工具","icon":"Target","parentId":"tools","isSubcategory":true},
   { id: "network","name":"网络工具","icon":"Wifi","parentId":"tools","isSubcategory":true},
-];
-
-export const INITIAL_LINKS: LinkItem[] = [
-  { id: '17656786301830', title: 'Cloudflare Dashboard', url: 'https://dash.cloudflare.com/', icon: proxyIconUrl('https://www.faviconextractor.com/favicon/dash.cloudflare.com?larger=true'), description: 'Cloudflare 资源和 Worker 控制台', categoryId: 'common', createdAt: 1765678630183, pinned: true, order: 0, iconType: 'faviconextractor', iconConfig: { iconType: 'faviconextractor' }, pinnedOrder: 0 },
-  { id: '17656786301831', title: 'GitHub', url: 'https://github.com/', icon: proxyIconUrl('https://www.faviconextractor.com/favicon/github.com?larger=true'), description: '代码托管和协作平台', categoryId: 'common', createdAt: 1765678630183, pinned: true, order: 1, iconType: 'faviconextractor', iconConfig: { iconType: 'faviconextractor' }, pinnedOrder: 1 },
-  { id: '17656786301832', title: 'Cloudflare Docs', url: 'https://developers.cloudflare.com/', icon: proxyIconUrl('https://www.faviconextractor.com/favicon/developers.cloudflare.com?larger=true'), description: 'Cloudflare 官方文档', categoryId: 'common', createdAt: 1765678630183, pinned: true, order: 2, iconType: 'faviconextractor', iconConfig: { iconType: 'faviconextractor' }, pinnedOrder: 2 },
-  { id: '17656786301833', title: 'ChatGPT', url: 'https://chatgpt.com/', icon: proxyIconUrl('https://www.faviconextractor.com/favicon/chatgpt.com?larger=true'), description: 'OpenAI 对话助手', categoryId: 'common', createdAt: 1765678630183, pinned: true, order: 3, iconType: 'faviconextractor', iconConfig: { iconType: 'faviconextractor' }, pinnedOrder: 3 },
-  { id: '17656786301834', title: 'Gemini', url: 'https://gemini.google.com/', icon: proxyIconUrl('https://www.faviconextractor.com/favicon/gemini.google.com?larger=true'), description: 'Google AI 助手', categoryId: 'common', createdAt: 1765678630183, pinned: true, order: 4, iconType: 'faviconextractor', iconConfig: { iconType: 'faviconextractor' }, pinnedOrder: 4 },
-  { id: '17656786301835', title: 'Gmail', url: 'https://mail.google.com/', icon: proxyIconUrl('https://www.faviconextractor.com/favicon/mail.google.com?larger=true'), description: '邮件收发入口', categoryId: 'common', createdAt: 1765678630183, pinned: true, order: 5, iconType: 'faviconextractor', iconConfig: { iconType: 'faviconextractor' }, pinnedOrder: 5 }
 ];

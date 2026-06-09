@@ -1,5 +1,6 @@
 import { AppConfig, WebDavConfig, SearchConfig, IconConfig, AIConfig, WebsiteConfig, TickerConfig, WeatherConfig } from '../../types';
 import { STORAGE_KEYS, API_ENDPOINTS } from '../constants';
+import { readJsonResponse } from './http';
 
 // 默认配置
 const DEFAULT_APP_CONFIG: AppConfig = {
@@ -263,7 +264,8 @@ class ConfigManager {
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data = await readJsonResponse<{ value?: unknown }>(response);
+        if (!data) return false;
         if (data.value) {
           const savedConfig = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
           this.config = { ...DEFAULT_APP_CONFIG, ...savedConfig };

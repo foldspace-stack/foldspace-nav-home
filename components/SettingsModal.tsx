@@ -3,6 +3,7 @@ import { X, Save, Settings, Clock, LayoutGrid, MessageCircle, Cloud, BookOpen, U
 import { AIConfig, PasswordExpiryConfig, TickerConfig, WeatherConfig, WeatherProvider, TickerSource, SearchConfig } from '../types';
 import { toast } from './Toast';
 import { API_ENDPOINTS, SEARCH_ENGINES } from '../src/constants';
+import { readJsonResponse } from '../src/utils/http';
 
 interface SettingsData {
   ai: AIConfig;
@@ -67,7 +68,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       setLoading(true);
       try {
         let res = await fetch(`${API_ENDPOINTS.SETTINGS}/config`, { credentials: 'include' });
-        let data = res.ok ? await res.json() : null;
+        let data = res.ok ? await readJsonResponse<{ value?: unknown }>(res) : null;
 
         if (data?.value) {
           // Mapping AppConfig to SettingsData structure
@@ -127,8 +128,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       const currentConfigRes = await fetch(`${API_ENDPOINTS.SETTINGS}/config`, { credentials: 'include' });
       let currentConfig: any = {};
       if (currentConfigRes.ok) {
-        const data = await currentConfigRes.json();
-        if (data.value) currentConfig = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+        const data = await readJsonResponse<{ value?: unknown }>(currentConfigRes);
+        if (data?.value) currentConfig = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
       }
 
       const newConfig = {

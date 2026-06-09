@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
 import { API_ENDPOINTS } from '../constants';
 import type { UserItem } from '../../types';
+import { readJsonResponse } from '../utils/http';
 
 // --- Types ---
 interface AuthState {
@@ -63,9 +64,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'SET_CHECKING', payload: true });
     try {
       const res = await fetch(`${API_ENDPOINTS.AUTH}/me`);
-      const data = await res.json() as { requiresAuth?: boolean; user?: UserItem | null };
+      const data = await readJsonResponse<{ requiresAuth?: boolean; user?: UserItem | null; hasBootstrap?: boolean }>(res);
+      if (!data) {
+        throw new Error(`Unexpected response from auth/me: ${res.status}`);
+      }
       dispatch({ type: 'SET_REQUIRES_AUTH', payload: Boolean(data.requiresAuth) });
-      dispatch({ type: 'SET_BOOTSTRAP', payload: Boolean((data as { hasBootstrap?: boolean }).hasBootstrap) });
+      dispatch({ type: 'SET_BOOTSTRAP', payload: Boolean(data.hasBootstrap) });
       if (data.user) {
         dispatch({ type: 'SET_USER', payload: data.user });
         dispatch({ type: 'SET_TOKEN', payload: 'session' });
@@ -97,12 +101,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(timeout);
 
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
+        const errData = await readJsonResponse<Record<string, unknown>>(res);
         console.error('Authentication failed:', res.status, errData);
         return false;
       }
 
-      const data = await res.json() as { success?: boolean; user?: UserItem };
+      const data = await readJsonResponse<{ success?: boolean; user?: UserItem }>(res);
+      if (!data) {
+        console.error('Authentication failed: unexpected non-JSON response');
+        return false;
+      }
       if (data.success && data.user) {
         dispatch({ type: 'SET_USER', payload: data.user });
         dispatch({ type: 'SET_TOKEN', payload: 'session' });
