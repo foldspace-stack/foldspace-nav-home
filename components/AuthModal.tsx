@@ -6,10 +6,11 @@ interface AuthModalProps {
   onLogin: (username: string, password: string) => Promise<boolean>;
   onBootstrap: (username: string, password: string) => Promise<boolean>;
   hasBootstrap: boolean;
+  errorMessage?: string | null;
   onClose: () => void;
 }
 
-const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onLogin, onBootstrap, hasBootstrap, onClose }) => {
+const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onLogin, onBootstrap, hasBootstrap, errorMessage, onClose }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -31,10 +32,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onLogin, onBootstrap, has
         setPassword('');
         onClose();
       } else {
-        setError('密码错误或无法连接服务器');
+        setError(errorMessage || '密码错误或无法连接服务器');
       }
     } catch (e) {
-      setError('登录请求失败，请检查网络');
+      setError(errorMessage || '登录请求失败，请检查网络');
     } finally {
       setIsLoading(false);
     }
@@ -93,9 +94,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onLogin, onBootstrap, has
               />
             </div>
 
-            {error && (
+            {(error || errorMessage) && (
               <div className="text-red-500 text-sm text-center font-medium">
-                {error}
+                {error || errorMessage}
               </div>
             )}
 

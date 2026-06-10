@@ -10,6 +10,7 @@ interface AuthState {
   requiresAuth: boolean | null;
   hasBootstrap: boolean;
   isCheckingAuth: boolean;
+  authError: string | null;
 }
 
 type AuthAction =
@@ -18,6 +19,7 @@ type AuthAction =
   | { type: 'SET_REQUIRES_AUTH'; payload: boolean }
   | { type: 'SET_BOOTSTRAP'; payload: boolean }
   | { type: 'SET_CHECKING'; payload: boolean }
+  | { type: 'SET_AUTH_ERROR'; payload: string | null }
   | { type: 'LOGOUT' };
 
 interface AuthContextValue extends AuthState {
@@ -40,8 +42,10 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
       return { ...state, hasBootstrap: action.payload };
     case 'SET_CHECKING':
       return { ...state, isCheckingAuth: action.payload };
+    case 'SET_AUTH_ERROR':
+      return { ...state, authError: action.payload };
     case 'LOGOUT':
-      return { ...state, authToken: null, user: null };
+      return { ...state, authToken: null, user: null, authError: null };
     default:
       return state;
   }
@@ -58,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     requiresAuth: null,
     hasBootstrap: false,
     isCheckingAuth: true,
+    authError: null,
   });
 
   const checkAuth = useCallback(async () => {
@@ -77,10 +82,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: 'SET_USER', payload: null });
         dispatch({ type: 'SET_TOKEN', payload: null });
       }
+      dispatch({ type: 'SET_AUTH_ERROR', payload: null });
     } catch (e) {
       console.error('Check auth failed:', e);
       dispatch({ type: 'SET_REQUIRES_AUTH', payload: false });
       dispatch({ type: 'SET_USER', payload: null });
+      dispatch({ type: 'SET_AUTH_ERROR', payload: e instanceof Error ? e.message : String(e) });
     } finally {
       dispatch({ type: 'SET_CHECKING', payload: false });
     }
@@ -88,6 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const authenticate = useCallback(async (endpoint: string, username: string, password: string): Promise<boolean> => {
     try {
+      dispatch({ type: 'SET_AUTH_ERROR', payload: null });
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10000); // 10s 超时
 
@@ -102,39 +110,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!res.ok) {
         const errData = await readJsonResponse<Record<string, unknown>>(res);
+        const errorMessage = [
+          `${endpoint === 'bootstrap' ? 'POST /api/auth/bootstrap' : 'POST /api/auth/login'}`,
+          `HTTP ${res.status}`,
+          typeof errData?.error === 'string' ? errData.error : null,
+          typeof errData?.details === 'string' ? errData.details : null,
+          typeof errData?.requestId === 'string' ? `requestId=${errData.requestId}` : null,
+        ].filter(Boolean).join(' | ');
         console.error('Authentication failed:', res.status, errData);
+        dispatch({ type: 'SET_AUTH_ERROR', payload: errorMessage || `HTTP ${res.status}` });
         return false;
       }
 
       const data = await readJsonResponse<{ success?: boolean; user?: UserItem }>(res);
       if (!data) {
         console.error('Authentication failed: unexpected non-JSON response');
+        dispatch({ type: 'SET_AUTH_ERROR', payload: 'Unexpected non-JSON response' });
         return false;
       }
       if (data.success && data.user) {
         dispatch({ type: 'SET_USER', payload: data.user });
         dispatch({ type: 'SET_TOKEN', payload: 'session' });
+        dispatch({ type: 'SET_AUTH_ERROR', payload: null });
         return true;
       }
 
       console.error('Authentication response missing user:', data);
+      dispatch({ type: 'SET_AUTH_ERROR', payload: 'Authentication response missing user' });
       return false;
     } catch (e) {
       if (e instanceof Error && e.name === 'AbortError') {
         console.error('Authentication timeout');
+        dispatch({ type: 'SET_AUTH_ERROR', payload: 'Authentication timeout' });
+        return false;
       } else {
         console.error('Authentication error:', e);
+        dispatch({ type: 'SET_AUTH_ERROR', payload: e instanceof Error ? e.message : String(e) });
+        return false;
       }
-      return false;
     }
   }, []);
 
   const login = useCallback(async (username: string, password: string): Promise<boolean> => {
-    return authenticate('login', username, password);
+    return (await authenticate('login', username, password)).success;
   }, [authenticate]);
 
   const bootstrap = useCallback(async (username: string, password: string): Promise<boolean> => {
-    return authenticate('bootstrap', username, password);
+    return (await authenticate('bootstrap', username, password)).success;
   }, [authenticate]);
 
   const logout = useCallback(() => {

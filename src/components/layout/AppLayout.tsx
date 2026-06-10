@@ -24,7 +24,7 @@ const QRCodeModal = lazy(() => import('../../../components/QRCodeModal'));
 
 export function AppLayout() {
   // Contexts
-  const { authToken, requiresAuth, hasBootstrap, isCheckingAuth, login, bootstrap, logout } = useAuthContext();
+  const { authToken, requiresAuth, hasBootstrap, isCheckingAuth, authError, login, bootstrap, logout } = useAuthContext();
   const { links = [], addLink, updateLink, deleteLink, deleteLinks, setLinksAndSync } = useLinksContext();
   const { categories = [], categoryTree = [], setCategoriesAndSync, unlockedCategoryIds = new Set(), unlockCategory } = useCategoriesContext();
   const { ai: aiConfig, icon: iconConfig, viewMode, showPinnedWebsites, ticker, weather, website, webdav, search, setAI, setWebsite, setShowPinned, setMastodon, setWeather, setWebDav, setSearch, setViewMode } = useConfigContext();
@@ -359,6 +359,7 @@ export function AppLayout() {
         onLogin={login}
         onBootstrap={bootstrap}
         hasBootstrap={hasBootstrap}
+        errorMessage={authError}
         onClose={() => setIsAuthOpen(false)}
       />
 
