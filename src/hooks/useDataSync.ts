@@ -16,12 +16,19 @@ export function useDataSync() {
   const initialized = useRef(false);
 
   // 从 localStorage 加载
+  const normalizeCategory = useCallback((cat: Category & { accessPasswordHash?: string; password?: string }): Category => ({
+    ...cat,
+    hasPassword: cat.hasPassword ?? Boolean(cat.password ?? cat.accessPasswordHash),
+    password: undefined,
+    accessPasswordHash: undefined,
+  }), []);
+
   const loadFromLocal = useCallback((): { links: LinkItem[]; categories: Category[] } => {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.LOCAL_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        let cats: Category[] = parsed.categories || DEFAULT_CATEGORIES;
+        let cats: Category[] = (parsed.categories || DEFAULT_CATEGORIES).map(normalizeCategory);
 
         // 确保 common 分类存在且排第一
         if (!cats.some((c: Category) => c.id === 'common')) {
@@ -45,8 +52,8 @@ export function useDataSync() {
     } catch (e) {
       console.error('Load from local failed:', e);
     }
-    return { links: [], categories: DEFAULT_CATEGORIES };
-  }, []);
+    return { links: [], categories: DEFAULT_CATEGORIES.map(normalizeCategory) };
+  }, [normalizeCategory]);
 
   // 从云端加载链接、分类和配置
   const loadFromCloud = useCallback(async (): Promise<{ links: LinkItem[]; categories: Category[]; config: Partial<Record<string, unknown>> } | null> => {
@@ -56,7 +63,7 @@ export function useDataSync() {
       const data = await readJsonResponse<Record<string, unknown>>(res);
       if (!data) return null;
       const linksFromServer = Array.isArray(data.links) ? data.links : [];
-      const categoriesFromServer = Array.isArray(data.categories) ? data.categories : [];
+      const categoriesFromServer = Array.isArray(data.categories) ? data.categories.map(normalizeCategory) : [];
       const configFromServer = data.config && typeof data.config === 'object' ? data.config : {};
       if (linksFromServer.length > 0 || categoriesFromServer.length > 0 || Object.keys(configFromServer).length > 0) {
         return { links: linksFromServer, categories: categoriesFromServer, config: configFromServer };
@@ -101,6 +108,7 @@ export function useDataSync() {
 
       if (cloud.links?.length || cloud.categories?.length) {
         let cats = cloud.categories || [];
+        cats = cats.map(normalizeCategory);
         if (cats.length > 0 && !cats.some((c: Category) => c.id === 'common')) {
           cats = [{ id: 'common', name: '常用推荐', icon: 'Star' }, ...cats];
         }
@@ -112,7 +120,7 @@ export function useDataSync() {
         }));
       }
     }
-  }, [loadFromLocal, loadFromCloud, initLinks, initCategories, initConfig]);
+  }, [loadFromLocal, loadFromCloud, initLinks, initCategories, initConfig, normalizeCategory]);
 
   // 同步到云端
   const syncToCloud = useCallback(async () => {

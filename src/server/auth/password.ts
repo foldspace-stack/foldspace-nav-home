@@ -1,4 +1,5 @@
 const encoder = new TextEncoder();
+const PBKDF2_ITERATIONS = 100000;
 
 function bytesToBase64(bytes: Uint8Array) {
   if (typeof btoa === 'function') {
@@ -37,8 +38,8 @@ async function deriveKey(password: string, salt: Uint8Array, iterations: number)
 
 export async function hashPassword(password: string) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const hash = await deriveKey(password, salt, 120000);
-  return `pbkdf2$120000$${bytesToBase64(salt)}$${bytesToBase64(hash)}`;
+  const hash = await deriveKey(password, salt, PBKDF2_ITERATIONS);
+  return `pbkdf2$${PBKDF2_ITERATIONS}$${bytesToBase64(salt)}$${bytesToBase64(hash)}`;
 }
 
 export async function verifyPassword(password: string, encoded: string) {

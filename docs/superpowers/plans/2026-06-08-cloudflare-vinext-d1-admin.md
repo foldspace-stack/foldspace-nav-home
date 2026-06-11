@@ -412,12 +412,12 @@ export async function hashPassword(password: string) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const key = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
   const derived = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: 120000, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
     key,
     256,
   );
 
-  return `pbkdf2$120000$${toBase64(salt)}$${toBase64(new Uint8Array(derived))}`;
+  return `pbkdf2$100000$${toBase64(salt)}$${toBase64(new Uint8Array(derived))}`;
 }
 
 export async function verifyPassword(password: string, encoded: string) {

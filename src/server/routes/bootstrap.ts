@@ -10,6 +10,11 @@ function json(data: unknown, status = 200) {
   });
 }
 
+function sanitizeCategoryForClient<T extends Record<string, unknown>>(category: T) {
+  const { accessPasswordHash, ...rest } = category;
+  return rest;
+}
+
 export async function routeBootstrapRequest(request: Request, env: Env) {
   if (request.method !== 'GET') {
     return json({ error: 'Method Not Allowed' }, 405);
@@ -24,7 +29,7 @@ export async function routeBootstrapRequest(request: Request, env: Env) {
   return json({
     sites,
     links: sites,
-    categories,
+    categories: categories.map(category => sanitizeCategoryForClient(category as Record<string, unknown>)),
     config,
   });
 }

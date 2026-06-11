@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Settings, Clock, LayoutGrid, MessageCircle, Cloud, BookOpen, Upload, CloudCog, LogOut, Loader2, Plus, Trash2, Search } from 'lucide-react';
+import { X, Save, Settings, Clock, LayoutGrid, MessageCircle, Cloud, Upload, CloudCog, LogOut, Loader2, Plus, Trash2, Search, AlertCircle } from 'lucide-react';
 import { AIConfig, PasswordExpiryConfig, TickerConfig, WeatherConfig, WeatherProvider, TickerSource, SearchConfig } from '../types';
 import { toast } from './Toast';
 import { API_ENDPOINTS, SEARCH_ENGINES } from '../src/constants';
@@ -17,18 +17,14 @@ interface SettingsData {
 
 const DEFAULT_SETTINGS: SettingsData = {
   ai: { 
-    provider: 'google', 
-    apiKey: '', 
-    baseUrl: 'https://generativelanguage.googleapis.com', 
-    model: 'gemini-3.1-flash-lite', 
+    provider: 'google',
+    apiKey: '',
+    baseUrl: '',
+    model: '',
     websiteTitle: '', 
     navigationName: '', 
+    sidebarNavigationName: '',
     faviconUrl: '',
-    providers: {
-      google: { apiKey: '', baseUrl: 'https://generativelanguage.googleapis.com', model: 'gemini-3.1-flash-lite' },
-      openai: { apiKey: '', baseUrl: 'https://api.openai.com/v1', model: 'gpt-5-nano' },
-      claude: { apiKey: '', baseUrl: 'https://api.anthropic.com', model: 'claude-haiku-4-5' },
-    }
   },
   passwordExpiry: { value: 1, unit: 'week' },
   ticker: { enabled: false, source: 'mastodon', customItems: [] },
@@ -38,11 +34,21 @@ const DEFAULT_SETTINGS: SettingsData = {
   search: { mode: 'internal', externalSources: [], selectedSource: null, defaultEngine: 'google' },
 };
 
-const AI_MODELS: Record<string, { label: string; defaultModel: string; defaultBaseUrl: string }> = {
-  google: { label: 'Google Gemini', defaultModel: 'gemini-3.1-flash-lite', defaultBaseUrl: 'https://generativelanguage.googleapis.com' },
-  openai: { label: 'OpenAI', defaultModel: 'gpt-5-nano', defaultBaseUrl: 'https://api.openai.com/v1' },
-  claude: { label: 'Claude', defaultModel: 'claude-haiku-4-5', defaultBaseUrl: 'https://api.anthropic.com' },
-};
+function normalizeBrandingAIConfig(ai?: Partial<AIConfig> | null): AIConfig {
+  return {
+    ...DEFAULT_SETTINGS.ai,
+    ...ai,
+    provider: 'google',
+    apiKey: '',
+    baseUrl: '',
+    model: '',
+    websiteTitle: ai?.websiteTitle ?? '',
+    navigationName: ai?.navigationName ?? '',
+    sidebarNavigationName: ai?.sidebarNavigationName ?? '',
+    faviconUrl: ai?.faviconUrl ?? '',
+    providers: {},
+  };
+}
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -60,12 +66,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [settings, setSettings] = useState<SettingsData>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [mastodonInput, setMastodonInput] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
     const fetchSettings = async () => {
       setLoading(true);
+      setSaveError('');
       try {
         let res = await fetch(`${API_ENDPOINTS.SETTINGS}/config`, { credentials: 'include' });
         let data = res.ok ? await readJsonResponse<{ value?: unknown }>(res) : null;
@@ -74,19 +82,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           // Mapping AppConfig to SettingsData structure
           const appConfig = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
           
-          // Ensure providers map exists
-          const aiConfig = appConfig.ai || DEFAULT_SETTINGS.ai;
-          if (!aiConfig.providers) {
-            aiConfig.providers = { ...DEFAULT_SETTINGS.ai.providers };
-            // Migration: put current active settings into the map
-            if (aiConfig.provider && aiConfig.providers[aiConfig.provider]) {
-              aiConfig.providers[aiConfig.provider] = {
-                apiKey: aiConfig.apiKey || '',
-                baseUrl: aiConfig.baseUrl || AI_MODELS[aiConfig.provider]?.defaultBaseUrl || '',
-                model: aiConfig.model || AI_MODELS[aiConfig.provider]?.defaultModel || '',
-              };
-            }
-          }
+          const aiConfig = normalizeBrandingAIConfig(appConfig.ai as Partial<AIConfig> | undefined);
 
           setSettings(prev => ({
             ...prev,
@@ -116,6 +112,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleSave = async () => {
     if (!authToken) { toast.error('请先登录'); return; }
     setSaving(true);
+    setSaveError('');
     try {
       const tickerConfig = { ...settings.ticker };
       if (tickerConfig.source === 'mastodon' && mastodonInput) {
@@ -123,7 +120,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         if (match) { tickerConfig.mastodonUsername = match[1]; tickerConfig.mastodonInstance = match[2]; }
       }
 
-      const finalSettings = { ...settings, ticker: tickerConfig };
+      const finalSettings = { ...settings, ticker: tickerConfig, ai: normalizeBrandingAIConfig(settings.ai) };
 
       const currentConfigRes = await fetch(`${API_ENDPOINTS.SETTINGS}/config`, { credentials: 'include' });
       let currentConfig: any = {};
@@ -132,9 +129,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         if (data?.value) currentConfig = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
       }
 
+      const nextAI = normalizeBrandingAIConfig({
+        ...currentConfig.ai,
+        ...finalSettings.ai,
+        websiteTitle: finalSettings.ai.websiteTitle?.trim() ?? '',
+        navigationName: finalSettings.ai.navigationName?.trim() ?? '',
+        sidebarNavigationName: finalSettings.ai.sidebarNavigationName?.trim() ?? '',
+        faviconUrl: finalSettings.ai.faviconUrl?.trim() ?? '',
+      });
+
       const newConfig = {
         ...currentConfig,
-        ai: finalSettings.ai,
+        ai: nextAI,
         website: { ...(currentConfig.website || {}), passwordExpiry: finalSettings.passwordExpiry },
         ticker: finalSettings.ticker,
         mastodon: finalSettings.ticker,
@@ -152,12 +158,28 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       });
 
       if (res.ok) {
-        setSettings(finalSettings);
-        onSettingsLoaded(finalSettings);
+        const mergedSettings = { ...finalSettings, ai: nextAI };
+        setSettings(mergedSettings);
+        onSettingsLoaded(mergedSettings);
         toast.success('设置已保存');
         onClose();
-      } else { toast.error('保存失败'); }
-    } catch (e) { toast.error('保存失败'); } finally { setSaving(false); }
+      } else {
+        const errData = await readJsonResponse<Record<string, unknown>>(res);
+        const message = [
+          'PUT /api/settings/config',
+          `HTTP ${res.status}`,
+          typeof errData?.error === 'string' ? errData.error : null,
+          typeof errData?.details === 'string' ? errData.details : null,
+          typeof errData?.requestId === 'string' ? `requestId=${errData.requestId}` : null,
+        ].filter(Boolean).join(' | ');
+        setSaveError(message || '保存失败，请查看接口返回的错误详情');
+        toast.error(message || '保存失败');
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      setSaveError(message);
+      toast.error('保存失败，请查看接口返回的错误详情');
+    } finally { setSaving(false); }
   };
 
   const update = <K extends keyof SettingsData>(key: K, value: SettingsData[K]) => {
@@ -166,37 +188,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const updateAI = (key: keyof AIConfig, value: any) => {
     setSettings(prev => {
-      const newAi = { ...prev.ai, [key]: value };
-      
-      // If updating provider, load stored settings for new provider
-      if (key === 'provider') {
-        const provider = value as keyof typeof AI_MODELS;
-        const stored = newAi.providers?.[provider];
-        if (stored) {
-          newAi.apiKey = stored.apiKey;
-          newAi.baseUrl = stored.baseUrl;
-          newAi.model = stored.model;
-        } else {
-          // Fallback to defaults if no stored config
-          const defaults = AI_MODELS[provider];
-          if (defaults) {
-            newAi.apiKey = '';
-            newAi.baseUrl = defaults.defaultBaseUrl;
-            newAi.model = defaults.defaultModel;
-          }
-        }
-      } 
-      // If updating specific field, sync with providers map
-      else if (['apiKey', 'baseUrl', 'model'].includes(key as string)) {
-        const provider = newAi.provider;
-        if (!newAi.providers) newAi.providers = {};
-        newAi.providers[provider] = {
-          ...(newAi.providers[provider] || { apiKey: '', baseUrl: '', model: '' }),
-          [key]: value
-        };
-      }
-      
-      return { ...prev, ai: newAi };
+      return { ...prev, ai: { ...prev.ai, [key]: value } };
     });
   };
 
@@ -235,6 +227,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           ) : (
             <>
+              {saveError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-900/10 p-3 text-sm text-red-700 dark:text-red-300 flex items-start gap-2">
+                  <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                  <div className="min-w-0 break-words whitespace-pre-wrap">{saveError}</div>
+                </div>
+              )}
+
               {/* 浏览器标签标题 */}
               <section>
                 <h4 className="font-bold dark:text-white mb-3 text-sm flex items-center gap-2">
@@ -553,38 +552,29 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </section>
 
-              {/* AI 配置 */}
+              {/* 站点标识 */}
               <section className="pt-6 border-t border-slate-200 dark:border-slate-700">
                 <h4 className="font-bold dark:text-white mb-3 text-sm flex items-center gap-2">
-                  <BookOpen size={16} /> AI 配置
+                  <Settings size={16} /> 站点标识
                 </h4>
                 <div className="space-y-4">
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs font-medium text-slate-500">AI 提供商</label>
-                      {settings.ai.provider === 'google' && <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-[10px] text-blue-500 hover:underline">Google Gemini API</a>}
-                      {settings.ai.provider === 'openai' && <a href="https://platform.openai.com/docs/api-reference" target="_blank" rel="noreferrer" className="text-[10px] text-blue-500 hover:underline">OpenAI API</a>}
-                      {settings.ai.provider === 'claude' && <a href="https://docs.anthropic.com/en/api/getting-started" target="_blank" rel="noreferrer" className="text-[10px] text-blue-500 hover:underline">Claude API</a>}
+                    <label className="block text-xs font-medium text-slate-500 mb-1">网站标题</label>
+                    <input type="text" value={settings.ai.websiteTitle || ''} onChange={(e) => updateAI('websiteTitle', e.target.value)} placeholder="foldspace 组织导航" className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">网页导航名称</label>
+                      <input type="text" value={settings.ai.navigationName || ''} onChange={(e) => updateAI('navigationName', e.target.value)} placeholder="foldspace 导航" className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
                     </div>
-                    <select value={settings.ai.provider} onChange={(e) => {
-                      updateAI('provider', e.target.value as any);
-                    }} className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none">
-                      {Object.entries(AI_MODELS).map(([key, val]) => (
-                        <option key={key} value={key}>{val.label}</option>
-                      ))}
-                    </select>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">侧边栏网页导航名称</label>
+                      <input type="text" value={settings.ai.sidebarNavigationName || ''} onChange={(e) => updateAI('sidebarNavigationName', e.target.value)} placeholder="留空则默认与网页导航名称相同" className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">API Key</label>
-                    <input type="password" value={settings.ai.apiKey || ''} onChange={(e) => updateAI('apiKey', e.target.value)} className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Base URL</label>
-                    <input type="text" value={settings.ai.baseUrl || ''} onChange={(e) => updateAI('baseUrl', e.target.value)} placeholder={AI_MODELS[settings.ai.provider]?.defaultBaseUrl || ''} className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">模型</label>
-                    <input type="text" value={settings.ai.model || ''} onChange={(e) => updateAI('model', e.target.value)} placeholder={AI_MODELS[settings.ai.provider]?.defaultModel || ''} className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                    <label className="block text-xs font-medium text-slate-500 mb-1">网站图标 URL</label>
+                    <input type="text" value={settings.ai.faviconUrl || ''} onChange={(e) => updateAI('faviconUrl', e.target.value)} placeholder="/favicon.ico" className="w-full h-11 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
                   </div>
                 </div>
               </section>

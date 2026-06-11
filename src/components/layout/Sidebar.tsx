@@ -38,7 +38,7 @@ export function Sidebar({ isOpen, onClose, activeCategoryId, onOpenCatManager, o
     const isExpanded = expandedCategories.has(cat.id);
     const isActive = activeCategoryId === cat.id;
     const hasChildren = cat.children && cat.children.length > 0;
-    const isLocked = cat.password && !unlockedCategoryIds.has(cat.id);
+    const isLocked = Boolean(cat.hasPassword) && !unlockedCategoryIds.has(cat.id);
 
     return (
       <div key={cat.id}>

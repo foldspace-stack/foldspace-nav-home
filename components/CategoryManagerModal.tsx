@@ -9,9 +9,9 @@ interface CategoryManagerModalProps {
   isOpen: boolean;
   onClose: () => void;
   categories: Category[];
-  onUpdateCategories: (newCategories: Category[]) => void;
-  onDeleteCategory: (id: string) => void;
-  onVerifyPassword?: (password: string) => Promise<boolean>;
+  onUpdateCategories: (newCategories: Category[]) => Promise<boolean>;
+  onDeleteCategory: (id: string) => Promise<boolean>;
+  onVerifyPassword?: (categoryId: string, password: string) => Promise<boolean>;
 }
 
 const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
@@ -26,6 +26,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   const [localCategories, setLocalCategories] = useState<Category[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -56,6 +57,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
       setLocalCategories([...categories]);
       setHasChanges(false);
       setEditingId(null);
+      setSaveError('');
     }
   }, [isOpen, categories]);
 
@@ -118,6 +120,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   // 保存到服务器（按 weight 排序）
   const handleSave = async () => {
     setIsSaving(true);
+    setSaveError('');
     try {
       // 分别对一级分类和二级分类按 weight 排序
       const topLevel = localCategories
@@ -138,21 +141,26 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
       const orphans = subs.filter(s => !topLevel.some(t => t.id === s.parentId));
       sorted.push(...orphans);
 
-      onUpdateCategories(sorted);
-      setHasChanges(false);
-      onClose();
+      const success = await onUpdateCategories(sorted);
+      if (success) {
+        setHasChanges(false);
+        onClose();
+      } else {
+        setSaveError('保存失败，请查看接口返回的错误详情');
+      }
     } catch (e) {
       console.error('Save failed:', e);
+      setSaveError(e instanceof Error ? e.message : String(e));
     } finally {
       setIsSaving(false);
     }
   };
 
   // 密码验证
-  const handlePasswordVerification = async (password: string): Promise<boolean> => {
+  const handlePasswordVerification = async (categoryId: string, password: string): Promise<boolean> => {
     if (!onVerifyPassword) return true;
     try {
-      return await onVerifyPassword(password);
+      return await onVerifyPassword(categoryId, password);
     } catch (error) {
       console.error('Password verification error:', error);
       return false;
@@ -204,7 +212,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   const startEdit = (cat: Category) => {
     setEditingId(cat.id);
     setEditName(cat.name);
-    setEditPassword(cat.password || '');
+    setEditPassword('');
     setEditIcon(cat.icon);
     setEditParentId(cat.parentId || '');
     setEditWeight(cat.weight ?? 0);
@@ -214,15 +222,18 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     if (!editingId || !editName.trim()) return;
     const newCats = localCategories.map(c => {
       if (c.id === editingId) {
-        return {
+        const updated: Category = {
           ...c,
           name: editName.trim(),
           icon: editIcon,
-          password: editPassword.trim() || undefined,
           parentId: editParentId || undefined,
           isSubcategory: !!editParentId,
           weight: editWeight,
         };
+        if (editPassword.trim()) {
+          updated.password = editPassword.trim();
+        }
+        return updated;
       }
       return c;
     });
@@ -238,11 +249,13 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
       id: Date.now().toString(),
       name: newCatName.trim(),
       icon: newCatIcon,
-      password: newCatPassword.trim() || undefined,
       parentId: newCatParentId || undefined,
       isSubcategory: !!newCatParentId,
       weight: maxWeight + 1,
     };
+    if (newCatPassword.trim()) {
+      newCat.password = newCatPassword.trim();
+    }
     markChanged([...localCategories, newCat]);
     setNewCatName('');
     setNewCatPassword('');
@@ -280,6 +293,11 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-2">
+            {saveError && (
+              <div className="p-3 rounded-lg bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300 text-sm">
+                {saveError}
+              </div>
+            )}
             {(() => {
               const topLevelCategories = localCategories
                 .filter(cat => !cat.isSubcategory && !cat.parentId)
@@ -354,9 +372,12 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                                   value={editPassword}
                                   onChange={(e) => setEditPassword(e.target.value)}
                                   className="flex-1 p-1.5 px-2 text-sm rounded border border-blue-500 dark:bg-slate-800 dark:text-white outline-none"
-                                  placeholder="密码（可选）"
+                                  placeholder="留空则保持当前密码"
                                 />
                               </div>
+                              {category.hasPassword && !editPassword && (
+                                <p className="text-[10px] text-slate-400">当前分类已设置密码，留空则保持不变。</p>
+                              )}
                               <div className="flex items-center gap-2">
                                 <span className="text-xs text-slate-500">排序权重:</span>
                                 <input
@@ -385,7 +406,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                               <span className="text-xs text-slate-400 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">
                                 w:{category.weight ?? 0}
                               </span>
-                              {category.password && <Lock size={12} className="text-slate-400" />}
+                              {category.hasPassword && <Lock size={12} className="text-slate-400" />}
                             </div>
                           )}
                         </div>
@@ -528,6 +549,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
               onClose={handleAuthModalClose}
               onVerify={handlePasswordVerification}
               onVerified={handleAuthSuccess}
+              categoryId={pendingAction.categoryId}
               actionType={pendingAction.type}
               categoryName={pendingAction.categoryName}
             />

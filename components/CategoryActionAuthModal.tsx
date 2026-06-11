@@ -4,7 +4,8 @@ import { X, Lock, AlertCircle } from 'lucide-react';
 interface CategoryActionAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onVerify: (password: string) => Promise<boolean>;
+  categoryId: string;
+  onVerify: (categoryId: string, password: string) => Promise<boolean>;
   onVerified: () => void;
   actionType: 'edit' | 'delete';
   categoryName: string;
@@ -13,6 +14,7 @@ interface CategoryActionAuthModalProps {
 const CategoryActionAuthModal: React.FC<CategoryActionAuthModalProps> = ({ 
   isOpen, 
   onClose, 
+  categoryId,
   onVerify,
   onVerified,
   actionType,
@@ -35,7 +37,7 @@ const CategoryActionAuthModal: React.FC<CategoryActionAuthModalProps> = ({
     setError('');
     
     try {
-      const success = await onVerify(password);
+      const success = await onVerify(categoryId, password);
       if (success) {
         setPassword('');
         onVerified();

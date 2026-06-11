@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Cloud, Download, Upload, CheckCircle2, AlertCircle, RefreshCw, Save, FolderUp } from 'lucide-react';
-import { Category, LinkItem, WebDavConfig, SearchConfig, AIConfig } from '../types';
+import { Category, LinkItem, WebDavConfig, SearchConfig } from '../types';
 import { checkWebDavConnection, uploadBackup, downloadBackup } from '../services/webDavService';
 import { generateBookmarkHtml, downloadHtmlFile } from '../services/exportService';
 import { API_ENDPOINTS } from '../src/constants';
@@ -15,12 +15,10 @@ interface BackupModalProps {
   onSaveWebDavConfig: (config: WebDavConfig) => void;
   searchConfig: SearchConfig;
   onRestoreSearchConfig: (searchConfig: SearchConfig) => void;
-  aiConfig: AIConfig;
-  onRestoreAIConfig: (aiConfig: AIConfig) => void;
 }
 
 const BackupModal: React.FC<BackupModalProps> = ({ 
-  isOpen, onClose, links, categories, onRestore, webDavConfig, onSaveWebDavConfig, searchConfig, onRestoreSearchConfig, aiConfig, onRestoreAIConfig 
+  isOpen, onClose, links, categories, onRestore, webDavConfig, onSaveWebDavConfig, searchConfig, onRestoreSearchConfig
 }) => {
   const [config, setConfig] = useState<WebDavConfig>(webDavConfig);
   const [isTesting, setIsTesting] = useState(false);
@@ -60,7 +58,7 @@ const BackupModal: React.FC<BackupModalProps> = ({
   const handleBackupToCloud = async () => {
     setSyncStatus('uploading');
     setStatusMsg('正在上传...');
-    const success = await uploadBackup(config, { links, categories, searchConfig, aiConfig });
+    const success = await uploadBackup(config, { links, categories, searchConfig });
     if (success) {
         setSyncStatus('success');
         setStatusMsg('备份成功！');
@@ -82,10 +80,6 @@ const BackupModal: React.FC<BackupModalProps> = ({
         // 恢复搜索配置（如果存在）
         if (data.searchConfig) {
             onRestoreSearchConfig(data.searchConfig);
-        }
-        // 恢复AI配置（如果存在）
-        if (data.aiConfig) {
-            onRestoreAIConfig(data.aiConfig);
         }
         setSyncStatus('success');
         setStatusMsg('恢复成功！');
@@ -112,7 +106,7 @@ const BackupModal: React.FC<BackupModalProps> = ({
       }
     } catch (e) { /* ignore */ }
 
-    const data = { links, categories, searchConfig, aiConfig, config: appConfig };
+    const data = { links, categories, searchConfig, config: appConfig };
     const json = JSON.stringify(data, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -156,11 +150,6 @@ const BackupModal: React.FC<BackupModalProps> = ({
         // 恢复搜索配置
         if (data.searchConfig) {
           onRestoreSearchConfig(data.searchConfig);
-        }
-
-        // 恢复 AI 配置
-        if (data.aiConfig) {
-          onRestoreAIConfig(data.aiConfig);
         }
 
         setImportStatus('success');
@@ -332,7 +321,7 @@ const BackupModal: React.FC<BackupModalProps> = ({
                 <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 flex items-center justify-between">
                     <div>
                         <h5 className="text-sm font-medium dark:text-slate-200">导入 cloudnav_backup.json 恢复</h5>
-                        <p className="text-xs text-slate-500 mt-1">从本地 JSON 备份文件恢复所有数据（链接、分类、搜索和 AI 配置）</p>
+                        <p className="text-xs text-slate-500 mt-1">从本地 JSON 备份文件恢复所有数据（链接、分类和搜索配置）</p>
                     </div>
                     <input
                         ref={fileInputRef}

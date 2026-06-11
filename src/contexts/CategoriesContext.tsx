@@ -26,13 +26,22 @@ interface CategoriesContextValue extends CategoriesState {
   deleteCategory: (id: string) => void;
   unlockCategory: (id: string) => void;
   toggleExpand: (id: string) => void;
-  setCategoriesAndSync: (categories: Category[], links: LinkItem[]) => void;
+  setCategoriesAndSync: (categories: Category[], links: LinkItem[]) => Promise<boolean>;
   categoryTree: CategoryWithChildren[];
   buildCategoryTree: (cats: Category[]) => CategoryWithChildren[];
 }
 
 export interface CategoryWithChildren extends Category {
   children: Category[];
+}
+
+function stripCategorySecrets(categories: Category[]): Category[] {
+  return categories.map(cat => ({
+    ...cat,
+    hasPassword: cat.hasPassword ?? Boolean(cat.password),
+    password: undefined,
+    accessPasswordHash: undefined,
+  }));
 }
 
 // --- Reducer ---
@@ -112,29 +121,64 @@ export function CategoriesProvider({ children }: { children: React.ReactNode }) 
     dispatch({ type: 'TOGGLE_EXPAND', payload: id });
   }, []);
 
-  const persist = useCallback((categories: Category[], links: LinkItem[]) => {
-    localStorage.setItem(STORAGE_KEYS.LOCAL_STORAGE_KEY, JSON.stringify({ links, categories }));
-    if (authToken) {
-      Promise.all([
-        fetch(API_ENDPOINTS.SITES, {
-          method: 'PUT',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ links }),
-        }),
-        fetch(API_ENDPOINTS.CATEGORIES, {
-          method: 'PUT',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ categories }),
-        }),
-      ]).catch(e => console.error('Sync categories failed:', e));
+  const persist = useCallback(async (categories: Category[], links: LinkItem[]) => {
+    const sanitizedCategories = stripCategorySecrets(categories);
+    if (!authToken) {
+      localStorage.setItem(STORAGE_KEYS.LOCAL_STORAGE_KEY, JSON.stringify({ links, categories: sanitizedCategories }));
+      return true;
     }
+
+    const [sitesRes, categoriesRes] = await Promise.all([
+      fetch(API_ENDPOINTS.SITES, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ links }),
+      }),
+      fetch(API_ENDPOINTS.CATEGORIES, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          categories: categories.map(cat => ({
+            ...cat,
+            accessPasswordHash: cat.password ?? undefined,
+          })),
+        }),
+      }),
+    ]);
+
+    if (!sitesRes.ok || !categoriesRes.ok) {
+      const [sitesError, categoriesError] = await Promise.all([
+        sitesRes.ok ? Promise.resolve(null) : sitesRes.json().catch(() => null),
+        categoriesRes.ok ? Promise.resolve(null) : categoriesRes.json().catch(() => null),
+      ]);
+      throw new Error([
+        !sitesRes.ok ? `sites:${sitesRes.status} ${typeof sitesError?.error === 'string' ? sitesError.error : ''} ${typeof sitesError?.details === 'string' ? sitesError.details : ''}`.trim() : null,
+        !categoriesRes.ok ? `categories:${categoriesRes.status} ${typeof categoriesError?.error === 'string' ? categoriesError.error : ''} ${typeof categoriesError?.details === 'string' ? categoriesError.details : ''}`.trim() : null,
+      ].filter(Boolean).join(' | '));
+    }
+
+    const categoriesPayload = await categoriesRes.json().catch(() => null);
+    const nextCategories = Array.isArray(categoriesPayload?.categories)
+      ? stripCategorySecrets(categoriesPayload.categories)
+      : sanitizedCategories;
+
+    localStorage.setItem(STORAGE_KEYS.LOCAL_STORAGE_KEY, JSON.stringify({ links, categories: nextCategories }));
+    return true;
   }, [authToken]);
 
-  const setCategoriesAndSync = useCallback((categories: Category[], links: LinkItem[]) => {
-    dispatch({ type: 'SET_CATEGORIES', payload: categories });
-    persist(categories, links);
+  const setCategoriesAndSync = useCallback(async (categories: Category[], links: LinkItem[]) => {
+    try {
+      const success = await persist(categories, links);
+      if (!success) return false;
+      const normalized = stripCategorySecrets(categories);
+      dispatch({ type: 'SET_CATEGORIES', payload: normalized });
+      return true;
+    } catch (e) {
+      console.error('Sync categories failed:', e);
+      return false;
+    }
   }, [persist]);
 
   const categoryTree = useMemo(() => buildCategoryTree(state.categories), [state.categories]);

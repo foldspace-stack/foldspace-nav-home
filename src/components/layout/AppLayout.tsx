@@ -11,6 +11,8 @@ import { MainContent } from './MainContent';
 import { ContentSkeleton } from './ContentSkeleton';
 import { LinkItem, Category } from '../../../types';
 import AuthModal from '../../../components/AuthModal';
+import { API_ENDPOINTS } from '../../constants';
+import { readJsonResponse } from '../../utils/http';
 
 const LinkModal = lazy(() => import('../../../components/LinkModal'));
 const CategoryManagerModal = lazy(() => import('../../../components/CategoryManagerModal'));
@@ -165,22 +167,49 @@ export function AppLayout() {
     }
   }, [deleteLink, links, categories, setLinksAndSync]);
 
-  const handleSaveLink = useCallback((data: Omit<LinkItem, 'id' | 'createdAt'>) => {
+  const handleSaveLink = useCallback(async (data: Omit<LinkItem, 'id' | 'createdAt'>) => {
     if (editingLink) {
       const updated = links.map(l => l.id === editingLink.id ? { ...l, ...data } : l);
-      setLinksAndSync(updated, categories);
+      return await setLinksAndSync(updated, categories);
     } else {
       const newLink: LinkItem = {
         ...data,
         id: Date.now().toString(),
         createdAt: Date.now(),
       };
-      setLinksAndSync([newLink, ...links], categories);
+      return await setLinksAndSync([newLink, ...links], categories);
     }
-    setIsModalOpen(false);
-    setEditingLink(undefined);
-    setPrefillLink(undefined);
   }, [editingLink, links, categories, setLinksAndSync]);
+
+  const verifyCategoryPassword = useCallback(async (categoryId: string, password: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`${API_ENDPOINTS.CATEGORIES}/${categoryId}/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ password }),
+      });
+
+      if (!res.ok) {
+        const errData = await readJsonResponse<Record<string, unknown>>(res);
+        const message = [
+          `POST /api/categories/${categoryId}/verify`,
+          `HTTP ${res.status}`,
+          typeof errData?.error === 'string' ? errData.error : null,
+          typeof errData?.details === 'string' ? errData.details : null,
+          typeof errData?.requestId === 'string' ? `requestId=${errData.requestId}` : null,
+        ].filter(Boolean).join(' | ');
+        console.warn('Category password verification failed:', message || res.statusText);
+        return false;
+      }
+
+      const data = await readJsonResponse<{ verified?: boolean }>(res);
+      return Boolean(data?.verified ?? true);
+    } catch (error) {
+      console.error('Category password verification error:', error);
+      return false;
+    }
+  }, []);
 
   // Context menu handlers
   const handleContextMenu = useCallback((e: React.MouseEvent, link: LinkItem) => {
@@ -373,7 +402,6 @@ export function AppLayout() {
             onDelete={editingLink ? () => handleDeleteLink(editingLink.id) : undefined}
             categories={categories}
             initialData={editingLink || prefillLink as LinkItem}
-            aiConfig={aiConfig}
             defaultCategoryId={undefined}
             iconConfig={iconConfig}
           />
@@ -387,8 +415,9 @@ export function AppLayout() {
             onUpdateCategories={(newCats) => setCategoriesAndSync(newCats, links)}
             onDeleteCategory={(id) => {
               const newCats = categories.filter(c => c.id !== id);
-              setCategoriesAndSync(newCats, links);
+              return setCategoriesAndSync(newCats, links);
             }}
+            onVerifyPassword={verifyCategoryPassword}
           />
         )}
 
@@ -403,8 +432,6 @@ export function AppLayout() {
             onSaveWebDavConfig={setWebDav}
             searchConfig={search || { mode: 'internal', externalSources: [] }}
             onRestoreSearchConfig={setSearch}
-            aiConfig={aiConfig}
-            onRestoreAIConfig={setAI}
           />
         )}
 
@@ -451,6 +478,7 @@ export function AppLayout() {
             isOpen={true}
             category={catAuthModalData}
             onClose={() => setCatAuthModalData(null)}
+            onVerify={verifyCategoryPassword}
             onUnlock={(id) => { unlockCategory(id); setCatAuthModalData(null); }}
           />
         )}

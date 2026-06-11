@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Upload, FileText, ArrowRight, Check, AlertCircle, FolderInput, ListTree, Database } from 'lucide-react';
-import { Category, LinkItem, SearchConfig, AIConfig } from '../types';
+import { Category, LinkItem, SearchConfig } from '../types';
 import { parseBookmarks } from '../services/bookmarkParser';
 import { toast } from './Toast';
 import { proxyIconUrl } from '../src/utils/iconProxy';
@@ -12,7 +12,6 @@ interface ImportModalProps {
   categories: Category[];
   onImport: (newLinks: LinkItem[], newCategories: Category[]) => void;
   onImportSearchConfig?: (searchConfig: SearchConfig) => void;
-  onImportAIConfig?: (aiConfig: AIConfig) => void;
 }
 
 const ImportModal: React.FC<ImportModalProps> = ({ 
@@ -21,8 +20,7 @@ const ImportModal: React.FC<ImportModalProps> = ({
   existingLinks, 
   categories, 
   onImport,
-  onImportSearchConfig,
-  onImportAIConfig
+  onImportSearchConfig
 }) => {
   const [step, setStep] = useState<'upload' | 'preview'>('upload');
   const [file, setFile] = useState<File | null>(null);
@@ -37,7 +35,6 @@ const ImportModal: React.FC<ImportModalProps> = ({
   const [parsedLinks, setParsedLinks] = useState<LinkItem[]>([]);
   const [parsedCategories, setParsedCategories] = useState<Category[]>([]);
   const [parsedSearchConfig, setParsedSearchConfig] = useState<SearchConfig | null>(null);
-  const [parsedAIConfig, setParsedAIConfig] = useState<AIConfig | null>(null);
 
   // Duplicate Links Handling
   const [duplicateLinks, setDuplicateLinks] = useState<Array<{ newLink: LinkItem; existingLink: LinkItem }>>([]);
@@ -94,7 +91,7 @@ const ImportModal: React.FC<ImportModalProps> = ({
   };
 
   // Parse JSON backup file
-  const parseJsonBackup = async (file: File): Promise<{ links: LinkItem[], categories: Category[], searchConfig?: SearchConfig, aiConfig?: AIConfig }> => {
+  const parseJsonBackup = async (file: File): Promise<{ links: LinkItem[], categories: Category[], searchConfig?: SearchConfig }> => {
     const text = await file.text();
     const data = JSON.parse(text);
 
@@ -107,7 +104,6 @@ const ImportModal: React.FC<ImportModalProps> = ({
       links: data.links,
       categories: data.categories,
       searchConfig: data.searchConfig,
-      aiConfig: data.aiConfig
     };
   };
 
@@ -292,7 +288,6 @@ const ImportModal: React.FC<ImportModalProps> = ({
     setParsedLinks([]);
     setParsedCategories([]);
     setParsedSearchConfig(null);
-    setParsedAIConfig(null);
     setNewLinksCount(0);
     setDuplicateCount(0);
     setNewCategoriesCount(0);
@@ -314,7 +309,7 @@ const ImportModal: React.FC<ImportModalProps> = ({
     setImportType(type);
 
     try {
-        let result: { links: LinkItem[], categories: Category[], searchConfig?: SearchConfig, aiConfig?: AIConfig };
+        let result: { links: LinkItem[], categories: Category[], searchConfig?: SearchConfig };
 
         if (type === 'html') {
             result = await parseBookmarks(selectedFile);
@@ -324,7 +319,6 @@ const ImportModal: React.FC<ImportModalProps> = ({
                 links: linksResult.links,
                 categories: [], // Links-only import doesn't include categories
                 searchConfig: undefined,
-                aiConfig: undefined
             };
         } else {
             result = await parseJsonBackup(selectedFile);
@@ -364,7 +358,6 @@ const ImportModal: React.FC<ImportModalProps> = ({
         setParsedLinks(uniqueNewLinks);
         setParsedCategories(uniqueNewCategories);
         setParsedSearchConfig(result.searchConfig || null);
-        setParsedAIConfig(result.aiConfig || null);
         setNewLinksCount(uniqueNewLinks.length);
         setDuplicateCount(duplicates);
         setNewCategoriesCount(uniqueNewCategories.length);
@@ -524,11 +517,6 @@ const ImportModal: React.FC<ImportModalProps> = ({
       // Import search config if available
       if (parsedSearchConfig && onImportSearchConfig) {
           onImportSearchConfig(parsedSearchConfig);
-      }
-      
-      // Import AI config if available
-      if (parsedAIConfig && onImportAIConfig) {
-          onImportAIConfig(parsedAIConfig);
       }
       
       handleClose();

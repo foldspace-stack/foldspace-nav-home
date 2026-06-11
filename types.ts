@@ -19,6 +19,7 @@ export interface Category {
   name: string;
   icon: string;
   password?: string;
+  hasPassword?: boolean;
   parentId?: string;
   isSubcategory?: boolean;
   weight?: number;

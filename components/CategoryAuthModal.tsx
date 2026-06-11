@@ -6,24 +6,41 @@ interface CategoryAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   category: Category | null;
+  onVerify: (categoryId: string, password: string) => Promise<boolean>;
   onUnlock: (categoryId: string) => void;
 }
 
-const CategoryAuthModal: React.FC<CategoryAuthModalProps> = ({ isOpen, onClose, category, onUnlock }) => {
+const CategoryAuthModal: React.FC<CategoryAuthModalProps> = ({ isOpen, onClose, category, onVerify, onUnlock }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
 
   if (!isOpen || !category) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === category.password) {
+    if (!password.trim()) {
+      setError('请输入密码');
+      return;
+    }
+
+    setIsVerifying(true);
+    setError('');
+
+    try {
+      const success = await onVerify(category.id, password);
+      if (success) {
         onUnlock(category.id);
         setPassword('');
         setError('');
         onClose();
-    } else {
+      } else {
         setError('密码错误');
+      }
+    } catch {
+      setError('验证失败，请重试');
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -53,6 +70,7 @@ const CategoryAuthModal: React.FC<CategoryAuthModalProps> = ({ isOpen, onClose, 
               className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-amber-500 outline-none transition-all text-center tracking-widest"
               placeholder="目录密码"
               autoFocus
+              disabled={isVerifying}
             />
           </div>
 
@@ -64,10 +82,11 @@ const CategoryAuthModal: React.FC<CategoryAuthModalProps> = ({ isOpen, onClose, 
 
           <button
             type="submit"
-            disabled={!password}
+            disabled={!password || isVerifying}
             className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-lg shadow-amber-500/30 flex items-center justify-center gap-2"
           >
-            解锁 <ArrowRight size={18} />
+            {isVerifying ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
+            {isVerifying ? '验证中...' : '解锁'}
           </button>
         </form>
       </div>

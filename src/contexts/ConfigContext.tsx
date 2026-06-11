@@ -54,7 +54,12 @@ const defaultAI: AIConfig = {
   provider: 'google',
   apiKey: '',
   baseUrl: '',
-  model: 'gemini-3.1-flash-lite',
+  model: '',
+  websiteTitle: '',
+  navigationName: '',
+  sidebarNavigationName: '',
+  faviconUrl: '',
+  providers: {},
 };
 
 const defaultWebsite: WebsiteConfig = {
@@ -83,6 +88,14 @@ const defaultWeather: WeatherConfig = {
   enabled: true, provider: 'jinrishici',
   unit: 'celsius',
 };
+
+const normalizeDisabledAIConfig = (config?: Partial<AIConfig> | null): AIConfig => ({
+  ...defaultAI,
+  websiteTitle: config?.websiteTitle ?? '',
+  navigationName: config?.navigationName ?? '',
+  sidebarNavigationName: config?.sidebarNavigationName ?? '',
+  faviconUrl: config?.faviconUrl ?? '',
+});
 
 // --- Reducer ---
 function configReducer(state: ConfigState, action: ConfigAction): ConfigState {
@@ -113,7 +126,7 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
   const savedViewMode = localStorage.getItem('cloudnav_view_mode_preference');
 
   const [state, dispatch] = useReducer(configReducer, {
-    ai: configManager.getAIConfig() || defaultAI,
+    ai: normalizeDisabledAIConfig(configManager.getAIConfig()),
     website: configManager.getWebsiteConfig() || defaultWebsite,
     webdav: configManager.getWebDavConfig() || defaultWebDav,
     search: configManager.getSearchConfig() || defaultSearch,
@@ -140,8 +153,9 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setAI = useCallback((config: AIConfig) => {
-    dispatch({ type: 'SET_AI', payload: config });
-    configManager.updateAIConfig(config);
+    const normalized = normalizeDisabledAIConfig(config);
+    dispatch({ type: 'SET_AI', payload: normalized });
+    configManager.updateAIConfig(normalized);
   }, []);
 
   const setWebsite = useCallback((config: WebsiteConfig) => {
@@ -205,7 +219,7 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
     await configManager.syncFromServer();
     const config = configManager.getConfig();
     dispatch({ type: 'LOAD_CONFIG', payload: {
-      ai: config.ai || defaultAI,
+      ai: normalizeDisabledAIConfig(config.ai),
       website: config.website || defaultWebsite,
       webdav: config.webdav || defaultWebDav,
       search: config.search || defaultSearch,

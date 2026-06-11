@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Sparkles, Loader2, Pin, Wand2, Trash2 } from 'lucide-react';
-import { LinkItem, Category, AIConfig, IconSourceType, IconConfig } from '../types';
-import { generateLinkDescription, suggestCategory } from '../services/geminiService';
+import { X, Loader2, Pin, Wand2, Trash2 } from 'lucide-react';
+import { LinkItem, Category, IconSourceType, IconConfig } from '../types';
 import { toast } from './Toast';
 import { API_ENDPOINTS } from '../src/constants';
 import { proxyIconUrl } from '../src/utils/iconProxy';
@@ -9,16 +8,15 @@ import { proxyIconUrl } from '../src/utils/iconProxy';
 interface LinkModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (link: Omit<LinkItem, 'id' | 'createdAt'>) => void;
+  onSave: (link: Omit<LinkItem, 'id' | 'createdAt'>) => Promise<boolean>;
   onDelete?: (id: string) => void;
   categories: Category[];
   initialData?: LinkItem;
-  aiConfig: AIConfig;
   defaultCategoryId?: string;
   iconConfig?: IconConfig;
 }
 
-const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete, categories, initialData, aiConfig, defaultCategoryId, iconConfig }) => {
+const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete, categories, initialData, defaultCategoryId, iconConfig }) => {
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
   const [description, setDescription] = useState('');
@@ -28,19 +26,20 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
   const [iconType, setIconType] = useState<IconSourceType>('faviconextractor');
   const [customApiUrl, setCustomApiUrl] = useState('');
   const [customApiParam, setCustomApiParam] = useState<'URL' | 'DOMAIN'>('URL');
-  const [isGenerating, setIsGenerating] = useState(false);
   const [isFetchingIcon, setIsFetchingIcon] = useState(false);
   const [autoFetchIcon, setAutoFetchIcon] = useState(true);
   const [batchMode, setBatchMode] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [weight, setWeight] = useState(0);
   const [pinnedOrder, setPinnedOrder] = useState(0);
+  const [saveError, setSaveError] = useState('');
   
   // 当模态框关闭时，重置批量模式为默认关闭状态
   useEffect(() => {
     if (!isOpen) {
       setBatchMode(false);
       setShowSuccessMessage(false);
+      setSaveError('');
     }
   }, [isOpen]);
   
@@ -150,10 +149,11 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!title || !url) return;
+    setSaveError('');
     
     // 确保URL有协议前缀
     let finalUrl = url;
@@ -162,7 +162,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
     }
     
     // 保存链接数据
-    onSave({
+    const success = await onSave({
       id: initialData?.id || '',
       title,
       url: finalUrl,
@@ -173,6 +173,11 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
       weight,
       pinnedOrder
     });
+
+    if (!success) {
+      setSaveError('保存失败，请查看接口返回的错误详情');
+      return;
+    }
     
     // 如果有自定义图标 URL，缓存到服务器设置
     if (icon && !icon.includes('faviconextractor.com')) {
@@ -197,41 +202,6 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
     }
   };
 
-  const handleAIAssist = async () => {
-    if (!url || !title) return;
-    if (!aiConfig.apiKey) {
-        toast.warning("请先点击侧边栏左下角设置图标配置 AI API Key");
-        return;
-    }
-
-    setIsGenerating(true);
-
-    // Parallel execution for speed
-    try {
-        const descPromise = generateLinkDescription(title, url, aiConfig);
-
-        // 只有在新建链接时才使用AI建议分类，编辑时保持原有分类
-        let catPromise = Promise.resolve(null);
-        if (!initialData) {
-            catPromise = suggestCategory(title, url, categories, aiConfig);
-        }
-
-        const [desc, cat] = await Promise.all([descPromise, catPromise]);
-
-        if (desc) setDescription(desc);
-        // 只有是新建链接且AI生成了分类建议时，才设置分类
-        if (cat && !initialData) {
-            setCategoryId(cat);
-        }
-
-    } catch (e) {
-        console.error("AI Assist failed", e);
-    } finally {
-        setIsGenerating(false);
-    }
-  };
-
-  
   const handleFetchIcon = async () => {
     if (!url) return;
 
@@ -343,6 +313,11 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
         </div>
 
         <form onSubmit={handleSave} className="p-4 space-y-4">
+          {saveError && (
+            <div className="p-3 rounded-lg bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300 text-sm">
+              {saveError}
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium mb-1 dark:text-slate-300">标题</label>
             <input
@@ -490,17 +465,6 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
           <div>
             <div className="flex justify-between items-center mb-1">
                 <label className="block text-sm font-medium dark:text-slate-300">描述 (选填)</label>
-                {(title && url) && (
-                    <button
-                        type="button"
-                        onClick={handleAIAssist}
-                        disabled={isGenerating}
-                        className="text-xs flex items-center gap-1 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors"
-                    >
-                        {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                        AI 自动填写
-                    </button>
-                )}
             </div>
             <textarea
               value={description}

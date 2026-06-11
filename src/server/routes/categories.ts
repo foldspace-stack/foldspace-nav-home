@@ -1,6 +1,7 @@
 import { createCategory, deleteCategory, getCategoryById, listCategories, updateCategory } from '../repositories/categories';
 import { moveSitesToCategory } from '../repositories/sites';
 import { getAuthenticatedUser } from './auth';
+import { verifyPassword } from '../auth/password';
 import type { Env } from '../env';
 
 function json(data: unknown, status = 200) {
@@ -8,6 +9,19 @@ function json(data: unknown, status = 200) {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+function sanitizeCategoryForClient<T extends Record<string, unknown>>(category: T) {
+  const { accessPasswordHash, ...rest } = category;
+  return rest;
+}
+
+function sanitizeCategoriesForClient(categories: unknown[]) {
+  return categories.map(category => (
+    category && typeof category === 'object'
+      ? sanitizeCategoryForClient(category as Record<string, unknown>)
+      : category
+  ));
 }
 
 async function requireEditor(request: Request, env: Env) {
@@ -22,18 +36,49 @@ async function readJsonBody<T>(request: Request): Promise<T> {
 }
 
 export async function routeCategoryRequest(request: Request, env: Env) {
+  const url = new URL(request.url);
+  const idMatch = url.pathname.match(/^\/api\/categories\/([^/]+)$/);
+  const verifyMatch = url.pathname.match(/^\/api\/categories\/([^/]+)\/verify$/);
+
   if (request.method === 'GET') {
     const categories = await listCategories(env.DB);
-    return json({ categories });
+    return json({ categories: sanitizeCategoriesForClient(categories) });
+  }
+
+  if (request.method === 'POST' && verifyMatch) {
+    const categoryId = verifyMatch[1];
+    const body = await readJsonBody<{ password?: string }>(request);
+
+    if (!categoryId) {
+      return json({ error: 'Not Found' }, 404);
+    }
+    if (typeof body.password !== 'string' || !body.password) {
+      return json({ error: 'password is required' }, 400);
+    }
+
+    const category = await getCategoryById(env.DB, categoryId);
+    if (!category) {
+      return json({ error: 'Not Found' }, 404);
+    }
+
+    const storedPassword = category.accessPasswordHash || '';
+    if (!storedPassword) {
+      return json({ success: true, verified: true });
+    }
+
+    const verified = storedPassword.startsWith('pbkdf2$')
+      ? await verifyPassword(body.password, storedPassword)
+      : body.password === storedPassword;
+
+    return verified
+      ? json({ success: true, verified: true })
+      : json({ success: false, verified: false, error: 'Invalid password' }, 401);
   }
 
   const editor = await requireEditor(request, env);
   if (!editor) {
     return json({ error: 'Unauthorized' }, 401);
   }
-
-  const url = new URL(request.url);
-  const idMatch = url.pathname.match(/^\/api\/categories\/([^/]+)$/);
 
   if (request.method === 'POST' && url.pathname === '/api/categories') {
     const body = await readJsonBody<{
@@ -42,6 +87,8 @@ export async function routeCategoryRequest(request: Request, env: Env) {
       parentId?: string | null;
       isSubcategory?: boolean;
       weight?: number;
+      password?: string | null;
+      accessPasswordHash?: string | null;
     }>(request);
 
     if (!body.name || !body.icon) {
@@ -59,9 +106,10 @@ export async function routeCategoryRequest(request: Request, env: Env) {
       parentId: body.parentId || null,
       isSubcategory: body.isSubcategory ?? Boolean(body.parentId),
       weight: body.weight ?? 0,
+      accessPasswordHash: body.accessPasswordHash ?? body.password ?? null,
     });
 
-    return json({ success: true, category }, 201);
+    return json({ success: true, category: sanitizeCategoryForClient(category) }, 201);
   }
 
   if (request.method === 'PUT' && url.pathname === '/api/categories') {
@@ -73,6 +121,8 @@ export async function routeCategoryRequest(request: Request, env: Env) {
         parentId?: string | null;
         isSubcategory?: boolean;
         weight?: number;
+        password?: string | null;
+        accessPasswordHash?: string | null;
       }>;
     }>(request);
 
@@ -104,6 +154,7 @@ export async function routeCategoryRequest(request: Request, env: Env) {
         isSubcategory: item.isSubcategory ?? Boolean(item.parentId),
         weight: item.weight ?? 0,
         id: item.id,
+        accessPasswordHash: item.accessPasswordHash ?? item.password ?? null,
       };
 
       if (item.id && existingById.has(item.id)) {
@@ -124,7 +175,7 @@ export async function routeCategoryRequest(request: Request, env: Env) {
     }
 
     const categories = await listCategories(env.DB);
-    return json({ success: true, categories });
+    return json({ success: true, categories: sanitizeCategoriesForClient(categories) });
   }
 
   if (!idMatch) {
@@ -143,6 +194,8 @@ export async function routeCategoryRequest(request: Request, env: Env) {
       parentId?: string | null;
       isSubcategory?: boolean;
       weight?: number;
+      password?: string | null;
+      accessPasswordHash?: string | null;
     }>(request);
 
     const existing = await getCategoryById(env.DB, categoryId);
@@ -161,9 +214,10 @@ export async function routeCategoryRequest(request: Request, env: Env) {
       parentId: body.parentId ?? existing.parentId ?? null,
       isSubcategory: body.isSubcategory ?? existing.isSubcategory,
       weight: body.weight ?? existing.weight,
+      accessPasswordHash: body.accessPasswordHash ?? body.password ?? existing.accessPasswordHash ?? null,
     });
 
-    return json({ success: true, category: updated });
+    return json({ success: true, category: updated ? sanitizeCategoryForClient(updated) : null });
   }
 
   if (request.method === 'DELETE') {

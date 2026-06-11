@@ -24,7 +24,7 @@ interface LinksContextValue extends LinksState {
   deleteLink: (id: string) => void;
   deleteLinks: (ids: Set<string>) => void;
   updateLinks: (links: LinkItem[]) => void;
-  setLinksAndSync: (links: LinkItem[], categories: Category[]) => void;
+  setLinksAndSync: (links: LinkItem[], categories: Category[]) => Promise<boolean>;
   pinnedLinks: LinkItem[];
   getLinksByCategory: (categoryId: string) => LinkItem[];
 }
@@ -93,6 +93,7 @@ export function LinksProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
       if (!sitesRes.ok || !categoriesRes.ok) throw new Error('Sync failed');
+      localStorage.setItem(STORAGE_KEYS.LOCAL_STORAGE_KEY, JSON.stringify({ links, categories }));
       dispatch({ type: 'SET_SYNC_STATUS', payload: 'saved' });
       setTimeout(() => dispatch({ type: 'SET_SYNC_STATUS', payload: 'idle' }), 2000);
       return true;
@@ -104,11 +105,12 @@ export function LinksProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // 持久化：本地 + 云端
-  const persist = useCallback((links: LinkItem[], categories: Category[]) => {
-    localStorage.setItem(STORAGE_KEYS.LOCAL_STORAGE_KEY, JSON.stringify({ links, categories }));
-    if (authToken) {
-      syncToCloud(links, categories);
+  const persist = useCallback(async (links: LinkItem[], categories: Category[]) => {
+    if (!authToken) {
+      localStorage.setItem(STORAGE_KEYS.LOCAL_STORAGE_KEY, JSON.stringify({ links, categories }));
+      return true;
     }
+    return syncToCloud(links, categories);
   }, [authToken, syncToCloud]);
 
   const addLink = useCallback((data: Omit<LinkItem, 'id' | 'createdAt'>) => {
@@ -137,9 +139,12 @@ export function LinksProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // 设置链接并同步（用于 updateData 场景）
-  const setLinksAndSync = useCallback((links: LinkItem[], categories: Category[]) => {
-    dispatch({ type: 'SET_LINKS', payload: links });
-    persist(links, categories);
+  const setLinksAndSync = useCallback(async (links: LinkItem[], categories: Category[]) => {
+    const success = await persist(links, categories);
+    if (success) {
+      dispatch({ type: 'SET_LINKS', payload: links });
+    }
+    return success;
   }, [persist]);
 
   // 置顶链接

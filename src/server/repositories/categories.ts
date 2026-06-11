@@ -30,7 +30,8 @@ export function toCategoryItem(category: CategoryRecord) {
     parentId: category.parent_id,
     isSubcategory: category.is_subcategory === 1,
     weight: category.weight,
-    accessPasswordHash: category.access_password_hash,
+    hasPassword: Boolean(category.access_password_hash),
+    accessPasswordHash: category.access_password_hash ?? undefined,
     createdAt: category.created_at,
     updatedAt: category.updated_at,
   };
