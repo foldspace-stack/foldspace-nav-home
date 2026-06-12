@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { LayoutGrid, Settings, Upload, X, Loader2, CheckCircle2, AlertCircle, Lock, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { LayoutGrid, Settings, Upload, X, Loader2, CheckCircle2, AlertCircle, ShieldCheck, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useCategoriesContext, CategoryWithChildren } from '../../contexts/CategoriesContext';
 import { useConfigContext } from '../../contexts/ConfigContext';
 import { useAuthContext } from '../../contexts/AuthContext';
@@ -55,7 +55,7 @@ export function Sidebar({ isOpen, onClose, activeCategoryId, onOpenCatManager, o
           <div className={`p-1.5 rounded-lg transition-colors flex items-center justify-center shrink-0 ${
             isActive ? 'bg-blue-100 dark:bg-blue-800' : 'bg-slate-100 dark:bg-slate-800'
           }`}>
-            {isLocked ? <Lock size={16} className="text-amber-500" /> : <Icon name={cat.icon} size={16} />}
+            {isLocked ? <ShieldCheck size={16} className="text-amber-500" /> : <Icon name={cat.icon} size={16} />}
           </div>
           <div className={`flex flex-1 items-center overflow-hidden transition-all ease-in-out ${isCollapsed ? 'max-w-0 opacity-0 ml-0 duration-150' : 'max-w-[200px] opacity-100 ml-3 duration-300 delay-150'}`}>
             <span className="truncate flex-1 text-left">{cat.name}</span>

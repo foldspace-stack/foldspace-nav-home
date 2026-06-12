@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, ArrowRight, Loader2, X } from 'lucide-react';
+import { ShieldCheck, ArrowRight, Loader2, X } from 'lucide-react';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -65,7 +65,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onLogin, onBootstrap, has
         <div className="p-8">
           <div className="flex flex-col items-center mb-6">
             <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-4 text-blue-600 dark:text-blue-400">
-              <Lock size={32} />
+              <ShieldCheck size={32} />
             </div>
             <h2 className="text-xl font-bold dark:text-white">身份验证</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 text-center mt-2">

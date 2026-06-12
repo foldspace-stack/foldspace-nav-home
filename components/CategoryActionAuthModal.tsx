@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Lock, AlertCircle } from 'lucide-react';
+import { X, ShieldCheck, AlertCircle } from 'lucide-react';
 
 interface CategoryActionAuthModalProps {
   isOpen: boolean;
@@ -71,7 +71,7 @@ const CategoryActionAuthModal: React.FC<CategoryActionAuthModalProps> = ({
 
         <div className="flex flex-col items-center mb-6">
           <div className={`w-14 h-14 bg-${colorClass}-100 dark:bg-${colorClass}-900/30 rounded-full flex items-center justify-center mb-4 text-${colorClass}-600 dark:text-${colorClass}-400`}>
-            <Lock size={28} />
+            <ShieldCheck size={28} />
           </div>
           <h2 className="text-lg font-bold dark:text-white">验证操作权限</h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 text-center mt-2">

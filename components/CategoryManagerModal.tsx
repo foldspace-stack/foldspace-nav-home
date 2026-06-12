@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ArrowUp, ArrowDown, Trash2, Edit2, Plus, Check, Lock, Unlock, Palette, Save } from 'lucide-react';
+import { X, ArrowUp, ArrowDown, Trash2, Edit2, Plus, Check, ShieldCheck, Unlock, Palette, Save } from 'lucide-react';
 import { Category } from '../types';
 import Icon from './Icon';
 import IconSelector from './IconSelector';
@@ -366,7 +366,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                                 </select>
                               </div>
                               <div className="flex items-center gap-2">
-                                <Lock size={14} className="text-slate-400" />
+                                <ShieldCheck size={14} className="text-slate-400" />
                                 <input
                                   type="password"
                                   value={editPassword}
@@ -406,7 +406,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                               <span className="text-xs text-slate-400 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">
                                 w:{category.weight ?? 0}
                               </span>
-                              {category.hasPassword && <Lock size={12} className="text-slate-400" />}
+                              {category.hasPassword && <ShieldCheck size={12} className="text-slate-400" />}
                             </div>
                           )}
                         </div>
@@ -430,7 +430,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                               )}
                               {category.id === 'common' && (
                                 <div className="p-1.5 text-slate-300" title="常用推荐分类不能被删除">
-                                  <Lock size={14} />
+                                  <ShieldCheck size={14} />
                                 </div>
                               )}
                             </>
@@ -480,7 +480,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
               </div>
               <div className="flex gap-2">
                 <div className="flex-1 relative">
-                  <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <ShieldCheck size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
                     value={newCatPassword}

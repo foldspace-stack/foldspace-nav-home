@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, ArrowRight, Loader2, X } from 'lucide-react';
+import { ShieldCheck, ArrowRight, Loader2, X } from 'lucide-react';
 import { Category } from '../types';
 
 interface CategoryAuthModalProps {
@@ -53,7 +53,7 @@ const CategoryAuthModal: React.FC<CategoryAuthModalProps> = ({ isOpen, onClose, 
 
         <div className="flex flex-col items-center mb-6">
           <div className="w-14 h-14 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mb-4 text-amber-600 dark:text-amber-400">
-            <Lock size={28} />
+            <ShieldCheck size={28} />
           </div>
           <h2 className="text-lg font-bold dark:text-white">解锁 "{category.name}"</h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 text-center mt-2">

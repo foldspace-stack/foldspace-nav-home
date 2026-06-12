@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Plus, Moon, Sun, Menu, Settings, Upload, CheckSquare, LogOut, UserRound, ChevronDown, GripVertical, Edit3, ChevronLeft, Layers } from 'lucide-react';
+import { Search, Plus, Moon, Sun, Menu, Settings, Upload, CheckSquare, LogOut, UserRound, ChevronDown, GripVertical, Edit3, ChevronLeft, Layers, ShieldCheck } from 'lucide-react';
 import { useConfigContext } from '../../contexts/ConfigContext';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { useLinksContext } from '../../contexts/LinksContext';
@@ -306,7 +306,7 @@ export function Header({
               className={`${isMobileSearchOpen ? 'hidden' : 'flex'} lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors cursor-pointer`}
               title="登录"
             >
-              <Lock size={14} />
+              <ShieldCheck size={14} />
               <span>登录</span>
             </button>
           )}

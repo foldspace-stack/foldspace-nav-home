@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, Loader2, Lock, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowRight, Loader2, ShieldCheck, Sparkles, KeyRound } from 'lucide-react';
 
 interface AuthPageProps {
   onLogin: (username: string, password: string) => Promise<boolean>;
@@ -89,7 +89,7 @@ export default function AuthPage({ onLogin, onBootstrap, hasBootstrap, errorMess
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/6 p-4 backdrop-blur">
                 <div className="flex items-center gap-2 text-sm text-slate-200">
-                  <Lock size={16} className="text-cyan-300" />
+                  <ShieldCheck size={16} className="text-cyan-300" />
                   安全入口
                 </div>
                 <p className="mt-2 text-sm leading-6 text-slate-400">
@@ -102,8 +102,8 @@ export default function AuthPage({ onLogin, onBootstrap, hasBootstrap, errorMess
           <div className="flex items-center justify-center">
             <div className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-900/80 p-6 shadow-2xl shadow-black/30 backdrop-blur-xl sm:p-8">
               <div className="mb-6">
-                <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-400/15 text-cyan-300 ring-1 ring-cyan-300/20">
-                  <Lock size={22} />
+              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-400/15 text-cyan-300 ring-1 ring-cyan-300/20">
+                  <KeyRound size={22} />
                 </div>
                 <h2 className="text-2xl font-semibold tracking-tight">
                   {hasBootstrap ? '创建第一个管理员' : '登录进入首页'}
