@@ -20,12 +20,13 @@ interface PinnedSectionProps {
   isDraggable?: boolean;
   isEditMode?: boolean;
   onWeightChange?: (linkId: string, weight: number) => void;
+  searchQuery?: string;
 }
 
 export function PinnedSection({
   links, viewMode = 'compact', isBatchEditMode, selectedLinks, onToggleSelection,
   onEditLink, onDeleteLink, onContextMenu, onDragEnd, sensors, authToken,
-  isDraggable = false, isEditMode = false, onWeightChange,
+  isDraggable = false, isEditMode = false, onWeightChange, searchQuery,
 }: PinnedSectionProps) {
   const sortedLinks = [...(links || [])].sort((a, b) => (a.pinnedOrder ?? 0) - (b.pinnedOrder ?? 0));
 
@@ -35,7 +36,7 @@ export function PinnedSection({
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-2">
         <Pin size={16} className="text-blue-500 fill-blue-500" />
         <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
           置顶 / 常用
@@ -46,7 +47,7 @@ export function PinnedSection({
       </div>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={sortedLinks.map(l => l.id)} strategy={rectSortingStrategy}>
-          <div className={`grid gap-3 ${gridClass}`}>
+          <div className={`grid gap-1.5 ${gridClass}`}>
             {sortedLinks.map(link => (
               <LinkCard
                 key={link.id}
@@ -62,6 +63,7 @@ export function PinnedSection({
                 isDraggable={isDraggable}
                 isEditMode={isEditMode}
                 onWeightChange={onWeightChange}
+                searchQuery={searchQuery}
               />
             ))}
           </div>

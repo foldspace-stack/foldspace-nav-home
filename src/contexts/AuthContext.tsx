@@ -152,11 +152,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (username: string, password: string): Promise<boolean> => {
-    return (await authenticate('login', username, password)).success;
+    return authenticate('login', username, password);
   }, [authenticate]);
 
   const bootstrap = useCallback(async (username: string, password: string): Promise<boolean> => {
-    return (await authenticate('bootstrap', username, password)).success;
+    return authenticate('bootstrap', username, password);
   }, [authenticate]);
 
   const logout = useCallback(() => {

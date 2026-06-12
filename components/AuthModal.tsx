@@ -8,9 +8,10 @@ interface AuthModalProps {
   hasBootstrap: boolean;
   errorMessage?: string | null;
   onClose: () => void;
+  showCloseButton?: boolean;
 }
 
-const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onLogin, onBootstrap, hasBootstrap, errorMessage, onClose }) => {
+const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onLogin, onBootstrap, hasBootstrap, errorMessage, onClose, showCloseButton = true }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -50,15 +51,16 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onLogin, onBootstrap, has
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md">
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-200 dark:border-slate-700 relative">
-        {/* 关闭按钮 */}
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors z-10"
-          title="关闭"
-        >
-          <X className="w-5 h-5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300" />
-        </button>
+        {showCloseButton && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-4 right-4 p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors z-10"
+            title="关闭"
+          >
+            <X className="w-5 h-5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300" />
+          </button>
+        )}
 
         <div className="p-8">
           <div className="flex flex-col items-center mb-6">

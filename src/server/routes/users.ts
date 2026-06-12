@@ -1,5 +1,5 @@
-import { createUser, listUsers, updateUserPassword, updateUserRole, updateUserStatus } from '../repositories/users';
-import { hashPassword } from '../auth/password';
+import { createUser, getUserByUsername, getUserRecordById, listUsers, updateUserPassword, updateUserProfile, updateUserRole, updateUserStatus, toUserItem } from '../repositories/users';
+import { hashPassword, verifyPassword } from '../auth/password';
 import { getAuthenticatedUser } from './auth';
 import type { Env } from '../env';
 
@@ -22,12 +22,66 @@ async function readJsonBody<T>(request: Request): Promise<T> {
 }
 
 export async function routeUserRequest(request: Request, env: Env) {
+  const url = new URL(request.url);
+
+  if (request.method === 'PATCH' && url.pathname === '/api/users/me') {
+    const currentUser = await getAuthenticatedUser(request, env);
+    if (!currentUser) {
+      return json({ error: 'Unauthorized' }, 401);
+    }
+
+    const body = await readJsonBody<{
+      username?: string;
+      displayName?: string;
+      currentPassword?: string;
+      newPassword?: string;
+    }>(request);
+
+    const newUsername = body.username?.trim();
+    const newDisplayName = body.displayName?.trim();
+    const currentPassword = body.currentPassword?.trim();
+    const newPassword = body.newPassword?.trim();
+
+    if (!currentPassword) {
+      return json({ error: 'currentPassword is required' }, 400);
+    }
+
+    const record = await getUserRecordById(env.DB, currentUser.id);
+    if (!record) {
+      return json({ error: 'User not found' }, 404);
+    }
+
+    const verified = await verifyPassword(currentPassword, record.password_hash);
+    if (!verified) {
+      return json({ error: 'Invalid current password' }, 401);
+    }
+
+    if ((newUsername && newUsername !== record.username) || (newDisplayName && newDisplayName !== record.display_name)) {
+      const targetUsername = newUsername || record.username;
+      if (newUsername) {
+        const exists = await getUserByUsername(env.DB, newUsername);
+        if (exists && exists.id !== record.id) {
+          return json({ error: 'Username already exists' }, 409);
+        }
+      }
+      await updateUserProfile(env.DB, record.id, {
+        username: newUsername,
+        displayName: newDisplayName ?? targetUsername,
+      });
+    }
+
+    if (newPassword) {
+      await updateUserPassword(env.DB, record.id, await hashPassword(newPassword));
+    }
+
+    const updated = await getUserRecordById(env.DB, record.id);
+    return json({ success: true, user: updated ? toUserItem(updated) : null });
+  }
+
   const admin = await requireAdmin(request, env);
   if (!admin) {
     return json({ error: 'Unauthorized' }, 401);
   }
-
-  const url = new URL(request.url);
 
   if (request.method === 'GET' && url.pathname === '/api/users') {
     const users = await listUsers(env.DB);

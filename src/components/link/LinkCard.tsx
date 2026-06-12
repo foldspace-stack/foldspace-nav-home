@@ -18,12 +18,13 @@ interface LinkCardProps {
   authToken?: string | null;
   isEditMode?: boolean;
   onWeightChange?: (linkId: string, weight: number) => void;
+  searchQuery?: string;
 }
 
 export function LinkCard({
   link, viewMode, isBatchEditMode, isSelected,
   onToggleSelection, onEdit, onDelete, onContextMenu,
-  isDraggable = true, authToken, isEditMode = false, onWeightChange,
+  isDraggable = true, authToken, isEditMode = false, onWeightChange, searchQuery,
 }: LinkCardProps) {
   const [imgError, setImgError] = useState(false);
   const [color, setColor] = useState<ExtractedColor | null>(null);
@@ -103,6 +104,39 @@ export function LinkCard({
     setIsEditingWeight(false);
   };
 
+  const highlightText = useCallback((text: string) => {
+    const query = searchQuery?.trim();
+    if (!query) return text;
+
+    const lowerText = text.toLowerCase();
+    const lowerQuery = query.toLowerCase();
+    const parts: Array<{ text: string; highlight: boolean }> = [];
+    let cursor = 0;
+
+    while (cursor < text.length) {
+      const matchIndex = lowerText.indexOf(lowerQuery, cursor);
+      if (matchIndex === -1) {
+        parts.push({ text: text.slice(cursor), highlight: false });
+        break;
+      }
+      if (matchIndex > cursor) {
+        parts.push({ text: text.slice(cursor, matchIndex), highlight: false });
+      }
+      parts.push({ text: text.slice(matchIndex, matchIndex + query.length), highlight: true });
+      cursor = matchIndex + query.length;
+    }
+
+      return parts.map((part, index) => (
+        part.highlight ? (
+        <mark key={`${part.text}-${index}`} className="rounded bg-amber-300 px-1 py-0.5 font-semibold text-slate-950 shadow-sm dark:bg-amber-400/30 dark:text-amber-50">
+          {part.text}
+        </mark>
+      ) : (
+        <React.Fragment key={`${part.text}-${index}`}>{part.text}</React.Fragment>
+      )
+    ));
+  }, [searchQuery]);
+
   return (
     <div
       ref={mergedRef}
@@ -114,8 +148,8 @@ export function LinkCard({
           : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
       } ${isBatchEditMode ? 'cursor-pointer' : isDraggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} ${
         isDetailedView
-          ? 'flex flex-col rounded-2xl border shadow-sm p-4 min-h-[100px] items-start justify-start text-left w-full min-w-0'
-          : 'flex items-center justify-between rounded-xl border shadow-sm p-3'
+          ? 'flex flex-col rounded-2xl border shadow-sm p-2.5 min-h-[88px] items-start justify-start text-left w-full min-w-0'
+          : 'flex items-center justify-between rounded-xl border shadow-sm p-2'
       } ${isDragging ? 'shadow-2xl scale-105' : ''}`}
       onClick={handleClick}
       onContextMenu={(e) => onContextMenu(e, link)}
@@ -182,17 +216,17 @@ export function LinkCard({
         {isDetailedView ? (
           <>
             <div className="flex flex-col md:flex-row md:items-start gap-3 w-full min-w-0">
-              <div className="flex items-center gap-3 w-full md:hidden">
-                <div className="text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm font-bold uppercase shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700 dark:to-slate-800 shadow-sm">
-                  {iconSrc ? <img src={iconSrc} alt="" className="w-6 h-6" loading="lazy" onError={() => setImgError(true)} /> : link.title.charAt(0).toUpperCase()}
+                <div className="flex items-center gap-3 w-full md:hidden">
+                  <div className="text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm font-bold uppercase shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700 dark:to-slate-800 shadow-sm">
+                    {iconSrc ? <img src={iconSrc} alt="" className="w-6 h-6" loading="lazy" onError={() => setImgError(true)} /> : link.title.charAt(0).toUpperCase()}
+                  </div>
+                  <h3 className="flex-1 min-w-0 text-slate-800 dark:text-slate-200 text-base font-medium overflow-hidden text-ellipsis whitespace-nowrap group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" title={link.title}>
+                    {highlightText(link.title)}
+                  </h3>
                 </div>
-                <h3 className="flex-1 min-w-0 text-slate-800 dark:text-slate-200 text-base font-medium overflow-hidden text-ellipsis whitespace-nowrap group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" title={link.title}>
-                  {link.title}
-                </h3>
-              </div>
               {link.description && (
                 <p className="w-full md:hidden text-sm text-slate-600 dark:text-slate-400 leading-relaxed overflow-hidden text-ellipsis whitespace-nowrap" title={link.description}>
-                  {link.description}
+                  {highlightText(link.description)}
                 </p>
               )}
               <div className="hidden md:flex text-blue-600 dark:text-blue-400 items-center justify-center text-sm font-bold uppercase shrink-0 w-14 h-14 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700 dark:to-slate-800 shadow-sm">
@@ -200,11 +234,11 @@ export function LinkCard({
               </div>
               <div className="hidden md:flex flex-1 min-w-0 flex-col justify-start w-full">
                 <h3 className="text-slate-800 dark:text-slate-200 text-base font-medium w-full min-w-0 overflow-hidden text-ellipsis whitespace-nowrap group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" title={link.title}>
-                  {link.title}
+                  {highlightText(link.title)}
                 </h3>
                 {link.description && (
                   <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed w-full min-w-0 overflow-hidden text-ellipsis whitespace-nowrap" title={link.description}>
-                    {link.description}
+                    {highlightText(link.description)}
                   </p>
                 )}
               </div>
@@ -217,7 +251,7 @@ export function LinkCard({
                 {iconSrc ? <img src={iconSrc} alt="" className="w-5 h-5" loading="lazy" onError={() => setImgError(true)} /> : link.title.charAt(0).toUpperCase()}
               </div>
               <h3 className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate whitespace-nowrap overflow-hidden text-ellipsis group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" title={link.title}>
-                {link.title}
+                {highlightText(link.title)}
               </h3>
             </div>
             {link.description && (

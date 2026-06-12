@@ -21,13 +21,12 @@ interface MainContentProps {
   isDragSortMode: boolean;
   isEditMode: boolean;
   onWeightChange: (linkId: string, weight: number) => void;
-  isInternal: boolean;
 }
 
 export function MainContent({
   searchQuery, searchResults, isBatchEditMode, selectedLinks,
   onToggleSelection, onEditLink, onDeleteLink, onContextMenu,
-  isDragSortMode, isEditMode, onWeightChange, isInternal,
+  isDragSortMode, isEditMode, onWeightChange,
 }: MainContentProps) {
   const { links = [], pinnedLinks = [], getLinksByCategory } = useLinksContext();
   const { categoryTree = [], categories = [] } = useCategoriesContext();
@@ -64,18 +63,20 @@ export function MainContent({
     ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'
     : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 3xl:grid-cols-10';
 
-  // Search mode: Only show results if internal search is checked
-  if (searchQuery.trim() && isInternal) {
+  if (searchQuery.trim()) {
     return (
-      <main className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-8">
+      <main className="flex-1 overflow-y-auto p-2 lg:p-4 space-y-4">
         <section>
-          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2 mb-4">
-            搜索结果
+          <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-4">
+            <span>搜索结果</span>
+            <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+              关键词: {searchQuery.trim()}
+            </span>
             <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded-full">
               {searchResults.length}
             </span>
           </h2>
-          <div className={`grid gap-3 ${gridClass}`}>
+          <div className={`grid gap-1.5 ${gridClass}`}>
             {searchResults.map(link => (
               <LinkCard
                 key={link.id}
@@ -90,6 +91,7 @@ export function MainContent({
                 authToken={authToken}
                 isEditMode={isEditMode}
                 onWeightChange={onWeightChange}
+                searchQuery={searchQuery}
               />
             ))}
           </div>
@@ -102,7 +104,7 @@ export function MainContent({
   }
 
   return (
-    <main className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-8">
+    <main className="flex-1 overflow-y-auto p-2 lg:p-4 space-y-4">
       {/* Pinned section */}
       {showPinnedWebsites && pinnedLinks.length > 0 && (
         <section id="cat-pinned">
@@ -149,6 +151,7 @@ export function MainContent({
             isDraggable={isDragSortMode}
             isEditMode={isEditMode}
             onWeightChange={onWeightChange}
+            searchQuery={searchQuery}
           />
         );
       })}

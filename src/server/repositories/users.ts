@@ -55,6 +55,16 @@ export async function getUserById(db: D1Database, id: string) {
   return row ? toUserItem(row) : null;
 }
 
+export async function getUserRecordById(db: D1Database, id: string) {
+  return firstOrNull<UserRecord>(
+    db.prepare(
+      `SELECT id, username, display_name, password_hash, role, status, created_at, updated_at, last_login_at
+       FROM users
+       WHERE id = ?`
+    ).bind(id)
+  );
+}
+
 export async function getUserByUsername(db: D1Database, username: string) {
   return firstOrNull<UserRecord>(
     db.prepare(
@@ -116,6 +126,39 @@ export async function updateUserPassword(db: D1Database, id: string, passwordHas
   await db.prepare(
     `UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?`
   ).bind(passwordHash, timestamp, id).run();
+}
+
+export async function updateUserUsername(db: D1Database, id: string, username: string, displayName?: string) {
+  const timestamp = now();
+  await db.prepare(
+    `UPDATE users SET username = ?, display_name = ?, updated_at = ? WHERE id = ?`
+  ).bind(username, displayName ?? username, timestamp, id).run();
+}
+
+export async function updateUserProfile(
+  db: D1Database,
+  id: string,
+  input: { username?: string; displayName?: string }
+) {
+  const timestamp = now();
+  const updates: string[] = [];
+  const bindings: Array<string | number> = [];
+
+  if (input.username !== undefined) {
+    updates.push('username = ?');
+    bindings.push(input.username);
+  }
+  if (input.displayName !== undefined) {
+    updates.push('display_name = ?');
+    bindings.push(input.displayName);
+  }
+
+  if (updates.length === 0) return;
+
+  updates.push('updated_at = ?');
+  bindings.push(timestamp, id);
+
+  await db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).bind(...bindings).run();
 }
 
 export async function updateUserRole(db: D1Database, id: string, role: 'admin' | 'editor' | 'user') {

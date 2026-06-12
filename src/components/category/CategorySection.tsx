@@ -22,13 +22,14 @@ interface CategorySectionProps {
   isDraggable?: boolean;
   isEditMode?: boolean;
   onWeightChange?: (linkId: string, weight: number) => void;
+  searchQuery?: string;
 }
 
 export function CategorySection({
   category, links, subcategoryLinks, viewMode,
   isBatchEditMode, selectedLinks, onToggleSelection,
   onEditLink, onDeleteLink, onContextMenu, onDragEnd, sensors,
-  authToken, isDraggable = false, isEditMode = false, onWeightChange,
+  authToken, isDraggable = false, isEditMode = false, onWeightChange, searchQuery,
 }: CategorySectionProps) {
   const allLinks = [...links, ...subcategoryLinks];
 
@@ -43,8 +44,8 @@ export function CategorySection({
     : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 3xl:grid-cols-10';
 
   return (
-    <section id={`cat-${category.id}`} className="mb-8 scroll-mt-20">
-      <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2 mb-4">
+    <section id={`cat-${category.id}`} className="mb-5 scroll-mt-20">
+      <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2 mb-2">
         <span>{category.name}</span>
         <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded-full">
           {allLinks.length}
@@ -55,7 +56,7 @@ export function CategorySection({
       {links.length > 0 && (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={links.map(l => l.id)} strategy={rectSortingStrategy}>
-            <div className={`grid gap-3 ${gridClass}`}>
+            <div className={`grid gap-1.5 ${gridClass}`}>
               {links.map(link => (
                 <LinkCard
                   key={link.id}
@@ -71,6 +72,7 @@ export function CategorySection({
                   isDraggable={isDraggable}
                   isEditMode={isEditMode}
                   onWeightChange={onWeightChange}
+                  searchQuery={searchQuery}
                 />
               ))}
             </div>
@@ -84,8 +86,8 @@ export function CategorySection({
         if (childLinks.length === 0) return null;
 
         return (
-          <div key={child.id} id={`cat-${child.id}`} className="mt-6 scroll-mt-20">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-2 mb-3">
+          <div key={child.id} id={`cat-${child.id}`} className="mt-3 scroll-mt-20">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-2 mb-1.5">
               <span>{child.name}</span>
               <span className="px-1.5 py-0.5 text-[10px] font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 rounded-full">
                 {childLinks.length}
@@ -93,7 +95,7 @@ export function CategorySection({
             </h3>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => onDragEnd(e, child.id)}>
               <SortableContext items={childLinks.map(l => l.id)} strategy={rectSortingStrategy}>
-                <div className={`grid gap-3 ${gridClass}`}>
+                <div className={`grid gap-1.5 ${gridClass}`}>
                   {childLinks.map(link => (
                     <LinkCard
                       key={link.id}
@@ -109,6 +111,7 @@ export function CategorySection({
                       isDraggable={isDraggable}
                       isEditMode={isEditMode}
                       onWeightChange={onWeightChange}
+                      searchQuery={searchQuery}
                     />
                   ))}
                 </div>

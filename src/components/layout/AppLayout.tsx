@@ -10,7 +10,9 @@ import { Sidebar } from './Sidebar';
 import { MainContent } from './MainContent';
 import { ContentSkeleton } from './ContentSkeleton';
 import { LinkItem, Category } from '../../../types';
+import AuthPage from '../../../components/AuthPage';
 import AuthModal from '../../../components/AuthModal';
+import ProfileModal from '../../../components/ProfileModal';
 import { API_ENDPOINTS } from '../../constants';
 import { readJsonResponse } from '../../utils/http';
 
@@ -26,16 +28,13 @@ const QRCodeModal = lazy(() => import('../../../components/QRCodeModal'));
 
 export function AppLayout() {
   // Contexts
-  const { authToken, requiresAuth, hasBootstrap, isCheckingAuth, authError, login, bootstrap, logout } = useAuthContext();
-  const { links = [], addLink, updateLink, deleteLink, deleteLinks, setLinksAndSync } = useLinksContext();
+  const { authToken, user, hasBootstrap, isCheckingAuth, authError, login, bootstrap, logout, checkAuth } = useAuthContext();
+  const { links = [], deleteLink, setLinksAndSync } = useLinksContext();
   const { categories = [], categoryTree = [], setCategoriesAndSync, unlockedCategoryIds = new Set(), unlockCategory } = useCategoriesContext();
   const { ai: aiConfig, icon: iconConfig, viewMode, showPinnedWebsites, ticker, weather, website, webdav, search, setAI, setWebsite, setShowPinned, setMastodon, setWeather, setWebDav, setSearch, setViewMode } = useConfigContext();
 
   // Hooks
-  const { 
-    searchQuery, setSearchQuery, searchResults, isMobileSearchOpen, setIsMobileSearchOpen, 
-    isInternal, setIsInternal, handleSearch, visitorEngineId, setVisitorEngineId 
-  } = useSearch();
+  const { searchQuery, setSearchQuery, searchResults, isMobileSearchOpen, setIsMobileSearchOpen, handleSearch } = useSearch();
   const { initData } = useDataSync();
 
   // UI State
@@ -54,6 +53,7 @@ export function AppLayout() {
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSearchConfigModalOpen, setIsSearchConfigModalOpen] = useState(false);
   const [catAuthModalData, setCatAuthModalData] = useState<Category | null>(null);
 
@@ -79,6 +79,7 @@ export function AppLayout() {
 
   // Drag sort confirmation state
   const [pendingDragLinks, setPendingDragLinks] = useState<{ links: LinkItem[]; categories: Category[] } | null>(null);
+  const isLoginLocked = !authToken && !isCheckingAuth;
 
   // Initialize data
   useEffect(() => {
@@ -324,6 +325,17 @@ export function AppLayout() {
     );
   }
 
+  if (isLoginLocked) {
+    return (
+      <AuthPage
+        onLogin={login}
+        onBootstrap={bootstrap}
+        hasBootstrap={hasBootstrap}
+        errorMessage={authError}
+      />
+    );
+  }
+
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden text-slate-900 dark:text-slate-50">
       {/* Sidebar */}
@@ -344,15 +356,13 @@ export function AppLayout() {
         <Header
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          isInternal={isInternal}
-          onInternalChange={setIsInternal}
           onSearch={handleSearch}
           onAddLink={handleAddLink}
           onOpenSettings={() => setIsSettingsModalOpen(true)}
           onOpenCatManager={() => setIsCatManagerOpen(true)}
           onOpenBackup={() => setIsBackupModalOpen(true)}
-          onOpenImport={() => setIsImportModalOpen(true)}
           onOpenAuth={() => setIsAuthOpen(true)}
+          onOpenProfile={() => setIsProfileModalOpen(true)}
           onToggleSidebar={() => setSidebarOpen(prev => !prev)}
           isBatchEditMode={isBatchEditMode}
           onToggleBatchEditMode={toggleBatchEditMode}
@@ -362,8 +372,6 @@ export function AppLayout() {
           onToggleDragSortMode={toggleDragSortMode}
           isEditMode={isEditMode}
           onToggleEditMode={toggleEditMode}
-          visitorEngineId={visitorEngineId}
-          onVisitorEngineChange={setVisitorEngineId}
         />
 
         <MainContent
@@ -378,7 +386,6 @@ export function AppLayout() {
           isDragSortMode={isDragSortMode}
           isEditMode={isEditMode}
           onWeightChange={handleWeightChange}
-          isInternal={isInternal}
         />
       </div>
 
@@ -390,6 +397,16 @@ export function AppLayout() {
         hasBootstrap={hasBootstrap}
         errorMessage={authError}
         onClose={() => setIsAuthOpen(false)}
+      />
+
+      <ProfileModal
+        isOpen={isProfileModalOpen}
+        currentUsername={user?.username || ''}
+        currentDisplayName={user?.displayName || ''}
+        onClose={() => setIsProfileModalOpen(false)}
+        onSaved={async () => {
+          await checkAuth();
+        }}
       />
 
       {/* Other Modals */}
